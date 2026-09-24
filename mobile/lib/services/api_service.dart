@@ -121,6 +121,19 @@ class ApiService {
     return jsonDecode(res.body);
   }
 
+  static Future<Map<String, dynamic>> bookBannerSeat(String token, String bannerId, int seats) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/drivers/banners/$bannerId/book-seat?seats=$seats'),
+      headers: getHeaders(token),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<List<dynamic>> getMerchantRfqFeed(String token) async {
+    final res = await http.get(Uri.parse('$baseUrl/rfq/merchant-feed'), headers: getHeaders(token));
+    return jsonDecode(res.body);
+  }
+
   // --- Tasks & Mobility ---
   static Future<Map<String, dynamic>> estimateTask(
       String token, double pLat, double pLng, double dLat, double dLng, String taskType) async {

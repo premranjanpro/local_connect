@@ -8,6 +8,8 @@ using ShopConnector.Core.Enums;
 using ShopConnector.Core.Interfaces;
 using ShopConnector.Infrastructure.Data;
 
+using System.Security.Cryptography;
+
 namespace ShopConnector.Api.Controllers;
 
 [ApiController]
@@ -17,11 +19,16 @@ public class DriversController : ControllerBase
 {
     private readonly CoreDbContext _dbContext;
     private readonly IAuditService _auditService;
+    private readonly IFcmNotificationService _fcmService;
 
-    public DriversController(CoreDbContext dbContext, IAuditService auditService)
+    public DriversController(
+        CoreDbContext dbContext,
+        IAuditService auditService,
+        IFcmNotificationService fcmService)
     {
         _dbContext = dbContext;
         _auditService = auditService;
+        _fcmService = fcmService;
     }
 
     private Guid? GetUserId()
@@ -239,4 +246,103 @@ public class DriversController : ControllerBase
             DriverPhone = b.Driver?.Phone
         }));
     }
+
+    [HttpPost("banners/{id}/book-seat")]
+    public async Task<IActionResult> BookBannerSeat(Guid id, [FromQuery] int seats = 1)
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var banner = await _dbContext.DriverIntercityBanners
+            .Include(b => b.Driver)
+            .FirstOrDefaultAsync(b => b.Id == id);
+
+        if (banner == null) return NotFound(new { message = "Intercity banner not found." });
+
+        if (banner.SeatsAvailable < seats)
+        {
+            return BadRequest(new { message = $"Only {banner.SeatsAvailable} seat(s) available." });
+        }
+
+        banner.SeatsAvailable -= seats;
+        if (banner.SeatsAvailable == 0)
+        {
+            banner.Status = "Filled";
+        }
+
+        var customer = await _dbContext.Users.FindAsync(userId.Value);
+        decimal totalFare = banner.ExpectedPrice * seats;
+
+        // Auto-create booking task
+        var pickupOtp = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+        var dropoffOtp = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
+
+        var task = new TaskEntity
+        {
+            CustomerId = userId.Value,
+            AssignedDriverId = banner.DriverId,
+            TaskType = TaskType.MobilityRide.ToString(),
+            Status = PlatformTaskStatus.Accepted.ToString(),
+            PickupAddress = $"{banner.FromCity} (Intercity Pickup)",
+            PickupLatitude = 26.9124,
+            PickupLongitude = 75.7873,
+            DropoffAddress = $"{banner.ToCity} (Intercity Dropoff)",
+            DropoffLatitude = 28.6139,
+            DropoffLongitude = 77.2090,
+            PickupOtp = pickupOtp,
+            DropoffOtp = dropoffOtp,
+            DistanceKm = 270.0m,
+            DurationMinutes = 280,
+            FareAmount = totalFare,
+            PaymentMode = PaymentMode.Cash.ToString(),
+            PaymentStatus = PaymentStatus.Pending.ToString(),
+            OrderItems = $"{{\"type\":\"IntercitySeatBooking\", \"route\":\"{banner.FromCity} -> {banner.ToCity}\", \"seats\":{seats}}}",
+            CreatedAt = DateTime.UtcNow,
+            AcceptedAt = DateTime.UtcNow
+        };
+
+        _dbContext.Tasks.Add(task);
+        await _dbContext.SaveChangesAsync();
+
+        await _auditService.LogActionAsync(
+            userId.Value,
+            "IntercitySeatBooked",
+            "DriverIntercityBanner",
+            banner.Id.ToString(),
+            details: $"{{\"seats\":{seats}, \"totalFare\":{totalFare}, \"taskId\":\"{task.Id}\"}}"
+        );
+
+        // Notify Driver via FCM
+        try
+        {
+            var driverSession = await _dbContext.UserDeviceSessions
+                .Where(s => s.UserId == banner.DriverId && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .OrderByDescending(s => s.LastActiveAt)
+                .FirstOrDefaultAsync();
+
+            if (driverSession != null && !string.IsNullOrEmpty(driverSession.FcmToken))
+            {
+                await _fcmService.SendPushNotificationAsync(
+                    banner.DriverId,
+                    driverSession.FcmToken,
+                    "Intercity Seat Booked!",
+                    $"{customer?.FullName ?? "Passenger"} booked {seats} seat(s) for {banner.FromCity} -> {banner.ToCity}. Total: Rs. {totalFare}",
+                    new Dictionary<string, string> { { "taskId", task.Id.ToString() }, { "type", "intercity_booking" } }
+                );
+            }
+        }
+        catch {}
+
+        return Ok(new
+        {
+            message = "Seat booked successfully!",
+            bannerId = banner.Id,
+            seatsBooked = seats,
+            remainingSeats = banner.SeatsAvailable,
+            taskId = task.Id,
+            pickupOtp,
+            fare = totalFare
+        });
+    }
 }
+

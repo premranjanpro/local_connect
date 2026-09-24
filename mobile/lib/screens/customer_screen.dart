@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../widgets/live_tracking_map_widget.dart';
 
 class CustomerScreen extends StatefulWidget {
   const CustomerScreen({super.key});
@@ -14,19 +15,25 @@ class CustomerScreen extends StatefulWidget {
 class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  // Mobility Form
+  // Mobility Form & Live Tracking
   final _pickupController = TextEditingController(text: 'Sindhi Camp, Jaipur');
   final _dropoffController = TextEditingController(text: 'Malviya Nagar, Jaipur');
   Map<String, dynamic>? _fareEstimate;
   Map<String, dynamic>? _activeRideTask;
   bool _isEstimating = false;
 
-  // Grocery RFQ & AI Form
+  // Grocery RFQ & AI Form & 3-Shop Comparative Quotes
   final _groceryPromptController = TextEditingController(text: 'Mujhe 5kg aaloo, 2 kg pyag, 1 kg tomato chahiye apne shopkeeper ko bhej diya');
   String _rfqMode = 'SingleShop'; // SingleShop, MultiShop, BroadcastNetwork
   Map<String, dynamic>? _activeRfq;
   Map<String, dynamic>? _aiAnalysis;
   bool _isAnalyzingAi = false;
+  List<dynamic> _rfqQuotes = [];
+  bool _loadingQuotes = false;
+
+  // Intercity Route Banners
+  List<dynamic> _banners = [];
+  bool _loadingBanners = false;
 
   // Subscriptions
   List<dynamic> _subscriptions = [];
@@ -42,6 +49,7 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
     _tabController = TabController(length: 4, vsync: this);
     _loadSubscriptions();
     _loadSocialData();
+    _loadBanners();
   }
 
   @override
@@ -185,6 +193,58 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
     } catch (_) {}
   }
 
+  Future<void> _loadBanners() async {
+    setState(() => _loadingBanners = true);
+    try {
+      final b = await ApiService.getIntercityBanners();
+      setState(() {
+        _banners = b;
+        _loadingBanners = false;
+      });
+    } catch (_) {
+      setState(() => _loadingBanners = false);
+    }
+  }
+
+  Future<void> _bookBannerSeat(String bannerId, String fromCity, String toCity, double price) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      final res = await ApiService.bookBannerSeat(auth.token!, bannerId, 1);
+      _showSnack('Seat booked for $fromCity -> $toCity! Pickup OTP: ${res['pickupOtp']}', Colors.green);
+      await _loadBanners();
+    } catch (e) {
+      _showSnack(e.toString(), Colors.redAccent);
+    }
+  }
+
+  Future<void> _loadRfqQuotes() async {
+    if (_activeRfq == null) return;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    setState(() => _loadingQuotes = true);
+    try {
+      final res = await ApiService.getRfq(auth.token!, _activeRfq!['id']);
+      setState(() {
+        _rfqQuotes = res['quotes'] ?? [];
+        _loadingQuotes = false;
+      });
+      _showSnack('Updated quotes from neighborhood shops!', Colors.blueAccent);
+    } catch (e) {
+      setState(() => _loadingQuotes = false);
+      _showSnack(e.toString(), Colors.redAccent);
+    }
+  }
+
+  Future<void> _acceptQuote(String quoteId, String shopName, double price, String paymentMode) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await ApiService.acceptRfqQuote(auth.token!, _activeRfq!['id'], quoteId, paymentMode);
+      _showSnack('Quote accepted from $shopName! Grocery delivery dispatched.', Colors.green);
+      await _loadRfqQuotes();
+    } catch (e) {
+      _showSnack(e.toString(), Colors.redAccent);
+    }
+  }
+
   void _showSnack(String msg, Color bg) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: bg));
@@ -275,19 +335,36 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                         ],
                         if (_activeRideTask != null) ...[
                           const SizedBox(height: 16),
+                          LiveTrackingMapWidget(
+                            pickupLat: (_activeRideTask!['pickupLatitude'] as num?)?.toDouble() ?? 26.9200,
+                            pickupLng: (_activeRideTask!['pickupLongitude'] as num?)?.toDouble() ?? 75.7900,
+                            dropoffLat: (_activeRideTask!['dropoffLatitude'] as num?)?.toDouble() ?? 26.8500,
+                            dropoffLng: (_activeRideTask!['dropoffLongitude'] as num?)?.toDouble() ?? 75.8200,
+                            initialDriverLat: 26.9150,
+                            initialDriverLng: 75.7950,
+                            status: _activeRideTask!['status'] ?? 'En Route',
+                            otp: _activeRideTask!['pickupOtp']?.toString(),
+                          ),
+                          const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber)),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.amber),
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Active Ride Dispatched!', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
-                                Text('Pickup OTP: ${_activeRideTask!['pickupOtp']} | Dropoff OTP: ${_activeRideTask!['dropoffOtp']}', style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const Text('Active Ride Dispatched & Tracked Live!', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 4),
+                                Text('Pickup OTP: ${_activeRideTask!['pickupOtp']} | Dropoff OTP: ${_activeRideTask!['dropoffOtp']}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 Text('Status: ${_activeRideTask!['status']}', style: const TextStyle(color: Colors.white70)),
                               ],
                             ),
-                          )
-                        ]
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -424,16 +501,83 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                           const SizedBox(height: 16),
                           Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3))),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('RFQ ID: ${_activeRfq!['id']}', style: const TextStyle(color: Colors.blueAccent, fontSize: 11, fontFamily: 'monospace')),
-                                Text('Mode: ${_activeRfq!['mode']} • Status: ${_activeRfq!['status']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text('Mode: ${_activeRfq!['mode']}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                    ElevatedButton.icon(
+                                      onPressed: _loadingQuotes ? null : _loadRfqQuotes,
+                                      icon: _loadingQuotes
+                                          ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                          : const Icon(Icons.refresh, size: 14),
+                                      label: const Text('Refresh Quotes', style: TextStyle(fontSize: 11)),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4)),
+                                    ),
+                                  ],
+                                ),
+                                Text('Status: ${_activeRfq!['status']}', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                               ],
                             ),
-                          )
-                        ]
+                          ),
+                          if (_rfqQuotes.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            const Text('3-Shop Comparative Rate Card:', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(height: 8),
+                            ..._rfqQuotes.map((q) {
+                              final price = (q['quotedTotalPrice'] as num?)?.toDouble() ?? 0.0;
+                              final prep = q['estimatedPrepMinutes'] ?? 15;
+                              final shop = q['businessName'] ?? 'Kirana Store';
+                              final details = q['quoteDetails'] ?? '';
+
+                              return Card(
+                                color: const Color(0xFF0F172A),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.greenAccent.withValues(alpha: 0.3))),
+                                margin: const EdgeInsets.only(bottom: 10),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(shop, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                                          Text('₹${price.toStringAsFixed(2)}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 17)),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('Ready in $prep mins • $details', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                      const Divider(height: 16, color: Colors.white12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: ElevatedButton(
+                                              onPressed: () => _acceptQuote(q['id'], shop, price, 'Cash'),
+                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.shade700, foregroundColor: Colors.white),
+                                              child: const Text('Accept Cash'),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: OutlinedButton(
+                                              onPressed: () => _acceptQuote(q['id'], shop, price, 'Dues'),
+                                              style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.amber)),
+                                              child: const Text('Add to Khata', style: TextStyle(color: Colors.amber)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                        ],
                       ],
                     ),
                   ),
@@ -512,6 +656,66 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const Text('Intercity Route Carpools & Banners', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 6),
+                Text('Scheduled intercity rides by verified drivers with fixed seats.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                const SizedBox(height: 10),
+                if (_loadingBanners)
+                  const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: Colors.indigoAccent)))
+                else if (_banners.isEmpty)
+                  const Text('No intercity banners active today.', style: TextStyle(color: Colors.grey))
+                else
+                  ..._banners.map((b) {
+                    final from = b['fromCity'] ?? 'City';
+                    final to = b['toCity'] ?? 'City';
+                    final price = (b['expectedPrice'] as num?)?.toDouble() ?? 1500.0;
+                    final seats = b['seatsAvailable'] ?? 0;
+                    final driver = b['driverName'] ?? 'Driver';
+
+                    return Card(
+                      color: const Color(0xFF1E293B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: Colors.indigoAccent.withValues(alpha: 0.3))),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.alt_route, color: Colors.indigoAccent, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text('$from ➔ $to', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                                  ],
+                                ),
+                                Text('₹${price.toStringAsFixed(0)}/seat', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text('Driver: $driver • Seats Remaining: $seats', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            const Divider(height: 16, color: Colors.white12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: ElevatedButton.icon(
+                                onPressed: seats > 0 ? () => _bookBannerSeat(b['id'], from, to, price) : null,
+                                icon: const Icon(Icons.airline_seat_recline_normal, size: 16),
+                                label: Text(seats > 0 ? 'Book 1 Seat (₹${price.toStringAsFixed(0)})' : 'Sold Out'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.indigoAccent,
+                                  foregroundColor: Colors.white,
+                                  textStyle: const TextStyle(fontSize: 12),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 20),
                 const Text('Social Meetups & Coffee Connect', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 const SizedBox(height: 8),
                 if (_meetups.isEmpty)

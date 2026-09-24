@@ -233,4 +233,32 @@ public class CustomerRfqController : ControllerBase
             dispatchedTaskId = task.Id
         });
     }
+
+    [HttpGet("merchant-feed")]
+    public async Task<IActionResult> GetMerchantFeed()
+    {
+        var openRfqs = await _dbContext.CustomerRfqs
+            .Include(r => r.Customer)
+            .Include(r => r.Quotes)
+                .ThenInclude(q => q.Business)
+            .Where(r => r.Status == RfqStatus.Open.ToString() || r.Status == RfqStatus.QuotesReceived.ToString())
+            .OrderByDescending(r => r.CreatedAt)
+            .Take(30)
+            .ToListAsync();
+
+        return Ok(openRfqs.Select(r => new
+        {
+            r.Id,
+            r.CustomerId,
+            CustomerName = r.Customer?.FullName,
+            r.Mode,
+            r.RawPrompt,
+            r.StructuredItems,
+            r.DeliveryAddress,
+            r.Status,
+            r.CreatedAt,
+            QuoteCount = r.Quotes.Count
+        }));
+    }
 }
+

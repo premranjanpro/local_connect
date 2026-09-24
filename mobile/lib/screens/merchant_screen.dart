@@ -30,11 +30,16 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
   final _khataAmountController = TextEditingController();
   final _khataNotesController = TextEditingController(text: 'Doorstep cash collected by delivery boy');
 
+  // Customer RFQ Feed
+  List<dynamic> _openRfqs = [];
+  bool _loadingRfqs = false;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadMerchantData();
+    _loadMerchantRfqs();
   }
 
   @override
@@ -61,7 +66,97 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
     } catch (_) {}
   }
 
+  Future<void> _loadMerchantRfqs() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated) return;
+    setState(() => _loadingRfqs = true);
+    try {
+      final feed = await ApiService.getMerchantRfqFeed(auth.token!);
+      setState(() {
+        _openRfqs = feed;
+        _loadingRfqs = false;
+      });
+    } catch (_) {
+      setState(() => _loadingRfqs = false);
+    }
+  }
 
+  Future<void> _submitQuoteForRfq(String rfqId, double price, int prepMin, String details) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await ApiService.submitRfqQuote(
+        auth.token!,
+        rfqId,
+        _businessId ?? '7a74b169-0512-4a3b-9f7d-6020832ceaf0',
+        price,
+        details,
+        prepMin,
+      );
+      _showSnack('Quote submitted to customer! Rate: ₹$price', Colors.green);
+      await _loadMerchantRfqs();
+    } catch (e) {
+      _showSnack(e.toString(), Colors.redAccent);
+    }
+  }
+
+  void _showQuoteDialog(dynamic rfq) {
+    final priceCtrl = TextEditingController(text: '150');
+    final prepCtrl = TextEditingController(text: '10');
+    final notesCtrl = TextEditingController(text: 'Fresh items ready for pickup');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Submit Direct Rate Quote', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Requirement: "${rfq['rawRequirementText']}"', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Offered Price (₹)', prefixText: '₹ '),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: prepCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Estimated Prep Time (Minutes)'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: notesCtrl,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(labelText: 'Item Notes / Remarks'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.shade700, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.pop(ctx);
+              final price = double.tryParse(priceCtrl.text) ?? 100.0;
+              final prep = int.tryParse(prepCtrl.text) ?? 10;
+              _submitQuoteForRfq(rfq['id'].toString(), price, prep, notesCtrl.text);
+            },
+            child: const Text('Send Quote to Customer'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _recordDoorstepCash() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -109,6 +204,7 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
           unselectedLabelColor: Colors.grey,
           tabs: const [
             Tab(icon: Icon(Icons.storefront), text: 'Shop & Dues'),
+            Tab(icon: Icon(Icons.local_offer), text: 'Customer RFQs'),
             Tab(icon: Icon(Icons.inventory_2), text: 'Catalog'),
             Tab(icon: Icon(Icons.menu_book), text: 'Digital Khata'),
           ],
@@ -153,7 +249,120 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
             ),
           ),
 
-          // 2. CATALOG MANAGEMENT
+          // 2. CUSTOMER RFQs FEED (Option 2: 3-Shop Comparative Rate Card)
+          RefreshIndicator(
+            onRefresh: _loadMerchantRfqs,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Live Neighborhood RFQs', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: Colors.greenAccent),
+                        onPressed: _loadMerchantRfqs,
+                        tooltip: 'Refresh RFQ Feed',
+                      ),
+                    ],
+                  ),
+                  const Text('Nearby customer requirement broadcasts awaiting shop quotes.', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  const SizedBox(height: 12),
+                  if (_loadingRfqs)
+                    const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator(color: Colors.greenAccent)))
+                  else if (_openRfqs.isEmpty)
+                    Card(
+                      color: const Color(0xFF1E293B),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: const Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Icon(Icons.inbox_outlined, color: Colors.grey, size: 48),
+                            SizedBox(height: 8),
+                            Text('No active customer broadcasts in your area.', style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._openRfqs.map((rfq) {
+                      final quotes = (rfq['quotes'] as List?) ?? [];
+                      final status = rfq['status']?.toString() ?? 'Open';
+                      return Card(
+                        color: const Color(0xFF1E293B),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: status == 'OrderCreated' ? Colors.greenAccent : Colors.white12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: status == 'OrderCreated' ? Colors.greenAccent.withValues(alpha: 0.15) : Colors.orangeAccent.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      status.toUpperCase(),
+                                      style: TextStyle(
+                                        color: status == 'OrderCreated' ? Colors.greenAccent : Colors.orangeAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Text('${quotes.length} Quotes Recvd', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                rfq['rawRequirementText'] ?? 'General Grocery Request',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(height: 6),
+                              Text('Requested By: ${rfq['customerId'] ?? "Customer"}', style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                              const SizedBox(height: 12),
+                              if (status != 'OrderCreated')
+                                ElevatedButton.icon(
+                                  onPressed: () => _showQuoteDialog(rfq),
+                                  icon: const Icon(Icons.send_rounded, size: 16),
+                                  label: const Text('Submit Competitive Quote'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.greenAccent.shade700,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                )
+                              else
+                                const Row(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
+                                    SizedBox(width: 6),
+                                    Text('Customer finalized order from quotes.', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+          ),
+
+          // 3. CATALOG MANAGEMENT
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(

@@ -41,7 +41,9 @@ class _DriverScreenState extends State<DriverScreen> {
     NotificationService.onTaskUpdated = (taskData) {
       if (mounted) {
         _loadDriverData();
-        _showSnack('🔔 New dispatch broadcast received!', Colors.amber);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🔔 New dispatch broadcast received!'), backgroundColor: Colors.amber),
+        );
       }
     };
   }
@@ -69,7 +71,7 @@ class _DriverScreenState extends State<DriverScreen> {
         _stopGpsBroadcastTimer();
         return;
       }
-      final driverId = auth.user?['id']?.toString() ?? '';
+      final driverId = auth.userId ?? '';
       if (driverId.isEmpty) return;
 
       // Realistic driver coordinates update

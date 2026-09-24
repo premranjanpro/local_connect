@@ -184,7 +184,7 @@ class MqttService {
       'accuracy': accuracy,
       'batteryPct': batteryPct,
       'isCharging': isCharging,
-      'timestamp': DateTime.UtcNow.toIso8601String(),
+      'timestamp': DateTime.now().toUtc().toIso8601String(),
     };
 
     final builder = MqttClientPayloadBuilder();
@@ -208,8 +208,4 @@ class MqttService {
     _isConnected = false;
     debugPrint('[MQTT] Client disconnected and reset.');
   }
-}
-
-extension DateTimeUtc on DateTime {
-  static DateTime get UtcNow => DateTime.now().toUtc();
 }

@@ -348,5 +348,34 @@ class ApiService {
     );
     return jsonDecode(res.body);
   }
+
+  // --- Telemetry ---
+  static Future<Map<String, dynamic>> recordGpsPing({
+    required String token,
+    required String deviceId,
+    required double latitude,
+    required double longitude,
+    double heading = 0.0,
+    double speed = 0.0,
+    double accuracy = 5.0,
+    int batteryPct = 100,
+    bool isCharging = false,
+  }) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/telemetry/ping'),
+      headers: getHeaders(token),
+      body: jsonEncode({
+        'deviceId': deviceId,
+        'latitude': latitude,
+        'longitude': longitude,
+        'heading': heading,
+        'speed': speed,
+        'accuracy': accuracy,
+        'batteryPct': batteryPct,
+        'isCharging': isCharging,
+      }),
+    );
+    return jsonDecode(res.body);
+  }
 }
 

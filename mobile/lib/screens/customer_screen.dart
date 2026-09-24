@@ -362,6 +362,8 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                             initialDriverLng: 75.7950,
                             status: _activeRideTask!['status'] ?? 'En Route',
                             otp: _activeRideTask!['pickupOtp']?.toString(),
+                            taskId: _activeRideTask!['id']?.toString(),
+                            driverId: _activeRideTask!['assignedDriverId']?.toString(),
                           ),
                           const SizedBox(height: 12),
                           Container(

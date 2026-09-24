@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../services/mqtt_service.dart';
 
 class LiveTrackingMapWidget extends StatefulWidget {
   final double pickupLat;
@@ -12,6 +13,8 @@ class LiveTrackingMapWidget extends StatefulWidget {
   final double initialDriverLng;
   final String status;
   final String? otp;
+  final String? taskId;
+  final String? driverId;
 
   const LiveTrackingMapWidget({
     super.key,
@@ -23,6 +26,8 @@ class LiveTrackingMapWidget extends StatefulWidget {
     required this.initialDriverLng,
     required this.status,
     this.otp,
+    this.taskId,
+    this.driverId,
   });
 
   @override
@@ -33,25 +38,57 @@ class _LiveTrackingMapWidgetState extends State<LiveTrackingMapWidget> {
   late LatLng _driverPos;
   double _currentSpeed = 38.5; // km/h
   Timer? _movementTimer;
+  StreamSubscription? _mqttSub;
+  bool _hasLiveMqtt = false;
   int _step = 0;
 
   @override
   void initState() {
     super.initState();
     _driverPos = LatLng(widget.initialDriverLat, widget.initialDriverLng);
+    _initMqttTracking();
     _startSimulatedMovement();
+  }
+
+  void _initMqttTracking() async {
+    if (widget.taskId == null && widget.driverId == null) return;
+    try {
+      final mqtt = MqttService();
+      await mqtt.connect();
+      if (widget.taskId != null) mqtt.subscribeToTaskTracking(widget.taskId!);
+      if (widget.driverId != null) mqtt.subscribeToDriverTracking(widget.driverId!);
+
+      _mqttSub = mqtt.locationStream.listen((update) {
+        if (!mounted) return;
+        final matchesTask = widget.taskId != null && update.taskId == widget.taskId;
+        final matchesDriver = widget.driverId != null && update.driverId == widget.driverId;
+        if (matchesTask || matchesDriver) {
+          setState(() {
+            _hasLiveMqtt = true;
+            _driverPos = LatLng(update.latitude, update.longitude);
+            _currentSpeed = update.speed;
+          });
+          _movementTimer?.cancel();
+        }
+      });
+    } catch (e) {
+      debugPrint('[LiveMap] MQTT tracking subscribe failed: $e');
+    }
   }
 
   @override
   void dispose() {
     _movementTimer?.cancel();
+    _mqttSub?.cancel();
+    if (widget.taskId != null) MqttService().unsubscribe('tasks/${widget.taskId}/tracking');
+    if (widget.driverId != null) MqttService().unsubscribe('driver/${widget.driverId}/tracking');
     super.dispose();
   }
 
   void _startSimulatedMovement() {
-    // Smoothly interpolate driver location towards destination
+    // Smoothly interpolate driver location towards destination if no live MQTT yet
     _movementTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) {
-      if (!mounted) return;
+      if (!mounted || _hasLiveMqtt) return;
       setState(() {
         _step++;
         // Target: move towards pickup first, then dropoff

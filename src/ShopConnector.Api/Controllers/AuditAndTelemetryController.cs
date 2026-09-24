@@ -7,6 +7,10 @@ using ShopConnector.Core.Entities;
 using ShopConnector.Core.Enums;
 using ShopConnector.Infrastructure.Data;
 
+using Microsoft.AspNetCore.SignalR;
+using ShopConnector.Api.Hubs;
+using ShopConnector.Core.Interfaces;
+
 namespace ShopConnector.Api.Controllers;
 
 [ApiController]
@@ -16,11 +20,19 @@ public class AuditAndTelemetryController : ControllerBase
 {
     private readonly CoreDbContext _coreDb;
     private readonly TelemetryDbContext _telemetryDb;
+    private readonly IMqttPublisher _mqttPublisher;
+    private readonly IHubContext<TelemetryHub> _telemetryHub;
 
-    public AuditAndTelemetryController(CoreDbContext coreDb, TelemetryDbContext telemetryDb)
+    public AuditAndTelemetryController(
+        CoreDbContext coreDb,
+        TelemetryDbContext telemetryDb,
+        IMqttPublisher mqttPublisher,
+        IHubContext<TelemetryHub> telemetryHub)
     {
         _coreDb = coreDb;
         _telemetryDb = telemetryDb;
+        _mqttPublisher = mqttPublisher;
+        _telemetryHub = telemetryHub;
     }
 
     private Guid? GetUserId()
@@ -121,6 +133,28 @@ public class AuditAndTelemetryController : ControllerBase
 
         await _telemetryDb.SaveChangesAsync();
         await _coreDb.SaveChangesAsync();
+
+        // 5. Broadcast to SignalR and MQTT for live moving tracking
+        var updatePayload = new
+        {
+            driverId = userId.Value,
+            taskId = activeTask?.Id.ToString(),
+            latitude = request.Latitude,
+            longitude = request.Longitude,
+            speed = request.Speed,
+            heading = request.Heading,
+            accuracy = request.Accuracy,
+            timestamp = DateTime.UtcNow
+        };
+
+        await _telemetryHub.Clients.Group($"driver_{userId.Value}").SendAsync("OnLocationUpdate", updatePayload);
+        await _mqttPublisher.PublishAsync($"driver/{userId.Value}/tracking", updatePayload);
+
+        if (activeTask != null)
+        {
+            await _telemetryHub.Clients.Group($"tracking_{activeTask.Id}").SendAsync("OnLocationUpdate", updatePayload);
+            await _mqttPublisher.PublishAsync($"tasks/{activeTask.Id}/tracking", updatePayload);
+        }
 
         return Ok(new { success = true, timestamp = ping.Timestamp });
     }

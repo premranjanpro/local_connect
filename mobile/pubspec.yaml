@@ -47,6 +47,7 @@ dependencies:
   permission_handler: ^13.0.2
   audioplayers: ^6.8.1
   livekit_client: ^2.3.6
+  mqtt_client: ^10.5.2
 
 dev_dependencies:
   flutter_test:

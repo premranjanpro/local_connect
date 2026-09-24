@@ -39,6 +39,12 @@ builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IFcmNotificationService, FcmNotificationService>();
 builder.Services.AddScoped<ILiveKitService, LiveKitService>();
 
+// 2.1 MQTT Telemetry Ingestion & Publishing
+builder.Services.Configure<ShopConnector.Api.Services.Mqtt.MqttOptions>(builder.Configuration.GetSection("Mqtt"));
+builder.Services.AddSingleton<ShopConnector.Api.Services.Mqtt.MqttLocationIngestionService>();
+builder.Services.AddSingleton<IMqttPublisher>(sp => sp.GetRequiredService<ShopConnector.Api.Services.Mqtt.MqttLocationIngestionService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ShopConnector.Api.Services.Mqtt.MqttLocationIngestionService>());
+
 // 3. JWT Authentication Setup
 var jwtSecret = builder.Configuration["Jwt:SecretKey"] ?? "ShopConnectorUltraSecureSecretKey2026!LongEnoughForSha256Signature";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "ShopConnectorApi";

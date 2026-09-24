@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
+import '../services/mqtt_service.dart';
 import 'calling_screen.dart';
 
 class DriverScreen extends StatefulWidget {
@@ -19,6 +21,11 @@ class _DriverScreenState extends State<DriverScreen> {
   List<dynamic> _vehicles = [];
   String? _activeVehicleId;
   bool _isLoading = false;
+
+  Timer? _gpsBroadcastTimer;
+  double _currentLat = 26.9124;
+  double _currentLng = 75.7873;
+  bool _isMqttTelemetryActive = false;
 
   // Intercity Banner controllers
   final _fromCityController = TextEditingController(text: 'Jaipur');
@@ -41,11 +48,65 @@ class _DriverScreenState extends State<DriverScreen> {
 
   @override
   void dispose() {
+    _stopGpsBroadcastTimer();
     _fromCityController.dispose();
     _toCityController.dispose();
     _priceController.dispose();
     _seatsController.dispose();
     super.dispose();
+  }
+
+  void _startGpsBroadcastTimer() async {
+    _gpsBroadcastTimer?.cancel();
+    final mqtt = MqttService();
+    await mqtt.connect();
+
+    if (mounted) setState(() => _isMqttTelemetryActive = true);
+
+    _gpsBroadcastTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (!auth.isAuthenticated || _dutyStatus == 'OffDuty') {
+        _stopGpsBroadcastTimer();
+        return;
+      }
+      final driverId = auth.user?['id']?.toString() ?? '';
+      if (driverId.isEmpty) return;
+
+      // Realistic driver coordinates update
+      _currentLat += 0.0002;
+      _currentLng += 0.00015;
+
+      // 1. MQTT Low-latency live telemetry to Mosquitto
+      mqtt.publishDriverLocation(
+        driverId: driverId,
+        deviceId: auth.deviceId,
+        latitude: _currentLat,
+        longitude: _currentLng,
+        speed: 38.0,
+        heading: 90.0,
+      );
+
+      // 2. HTTP durable fallback ping
+      try {
+        await ApiService.recordGpsPing(
+          token: auth.token!,
+          deviceId: auth.deviceId,
+          latitude: _currentLat,
+          longitude: _currentLng,
+          heading: 90.0,
+          speed: 38.0,
+          accuracy: 4.5,
+          batteryPct: 92,
+          isCharging: false,
+        );
+      } catch (_) {}
+    });
+  }
+
+  void _stopGpsBroadcastTimer() {
+    _gpsBroadcastTimer?.cancel();
+    _gpsBroadcastTimer = null;
+    if (mounted) setState(() => _isMqttTelemetryActive = false);
   }
 
   Future<void> _loadDriverData() async {
@@ -62,6 +123,7 @@ class _DriverScreenState extends State<DriverScreen> {
         _activeVehicleId = active != null ? active['id'] : null;
         if (_activeVehicleId != null && _dutyStatus == 'OffDuty') {
           _dutyStatus = 'Free';
+          _startGpsBroadcastTimer();
         }
         _isLoading = false;
       });
@@ -75,9 +137,17 @@ class _DriverScreenState extends State<DriverScreen> {
     try {
       final res = await ApiService.updateDutyStatus(auth.token!, newStatus, auth.deviceId);
       setState(() => _dutyStatus = res['dutyStatus'] ?? newStatus);
+      if (_dutyStatus != 'OffDuty') {
+        _startGpsBroadcastTimer();
+      } else {
+        _stopGpsBroadcastTimer();
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Duty status set to $_dutyStatus'), backgroundColor: Colors.green),
+          SnackBar(
+            content: Text('Duty status: $_dutyStatus • MQTT Telemetry: ${_dutyStatus != "OffDuty" ? "Streaming" : "Paused"}'),
+            backgroundColor: _dutyStatus != 'OffDuty' ? Colors.green : Colors.grey,
+          ),
         );
       }
     } catch (e) {
@@ -233,6 +303,32 @@ class _DriverScreenState extends State<DriverScreen> {
                                 onSelected: (_) => _toggleDutyStatus(status),
                               );
                             }).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: _isMqttTelemetryActive ? Colors.green.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: _isMqttTelemetryActive ? Colors.greenAccent : Colors.white24),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.radar, size: 16, color: _isMqttTelemetryActive ? Colors.greenAccent : Colors.grey),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _isMqttTelemetryActive
+                                      ? 'MQTT Telemetry: Active (Mosquitto 1883 • ~4s pings)'
+                                      : 'MQTT Telemetry: Off Duty (Tap Free to Stream)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: _isMqttTelemetryActive ? Colors.greenAccent : Colors.grey,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

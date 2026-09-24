@@ -277,4 +277,36 @@ class ApiService {
     final res = await http.get(Uri.parse('$baseUrl/community/classifieds'));
     return jsonDecode(res.body);
   }
+
+  // --- FCM Notifications ---
+  static Future<Map<String, dynamic>> updateFcmToken(String token, String fcmToken, String deviceId) async {
+    final res = await http.put(
+      Uri.parse('$baseUrl/notifications/fcm-token'),
+      headers: getHeaders(token),
+      body: jsonEncode({'fcmToken': fcmToken, 'deviceId': deviceId}),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> sendTestPush(String token, String fcmToken, String title, String body) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/notifications/test-push'),
+      headers: getHeaders(token),
+      body: jsonEncode({'fcmToken': fcmToken, 'title': title, 'body': body}),
+    );
+    return jsonDecode(res.body);
+  }
+
+  // --- Python AI Agent Microservice ---
+  static String aiBaseUrl = 'http://localhost:8000/api/v1/ai';
+
+  static Future<Map<String, dynamic>> parseAiIntent(String text, {String role = 'Customer'}) async {
+    final res = await http.post(
+      Uri.parse('$aiBaseUrl/parse-intent'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'text': text, 'user_role': role}),
+    );
+    return jsonDecode(res.body);
+  }
 }
+

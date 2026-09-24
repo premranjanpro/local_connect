@@ -69,6 +69,12 @@ class AuthProvider with ChangeNotifier {
       await prefs.setString('user_name', _fullName!);
       await prefs.setString('user_role', _role!);
 
+      // Auto-register FCM Push Notification token for this device session
+      try {
+        final fcmToken = 'FCM_${_deviceId}_${const Uuid().v4().substring(0, 8)}';
+        await ApiService.updateFcmToken(_token!, fcmToken, _deviceId);
+      } catch (_) {}
+
       _isLoading = false;
       notifyListeners();
       return true;

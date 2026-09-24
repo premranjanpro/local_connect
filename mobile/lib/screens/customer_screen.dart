@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -20,10 +21,12 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
   Map<String, dynamic>? _activeRideTask;
   bool _isEstimating = false;
 
-  // Grocery RFQ Form
-  final _groceryPromptController = TextEditingController(text: 'Mujhe 5kg aaloo, 2kg pyaj, 1kg tomato chahiye');
+  // Grocery RFQ & AI Form
+  final _groceryPromptController = TextEditingController(text: 'Mujhe 5kg aaloo, 2 kg pyag, 1 kg tomato chahiye apne shopkeeper ko bhej diya');
   String _rfqMode = 'SingleShop'; // SingleShop, MultiShop, BroadcastNetwork
   Map<String, dynamic>? _activeRfq;
+  Map<String, dynamic>? _aiAnalysis;
+  bool _isAnalyzingAi = false;
 
   // Subscriptions
   List<dynamic> _subscriptions = [];
@@ -90,13 +93,41 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
     }
   }
 
+  Future<void> _analyzeWithAi() async {
+    final query = _groceryPromptController.text.trim();
+    if (query.isEmpty) return;
+    setState(() => _isAnalyzingAi = true);
+    try {
+      final res = await ApiService.parseAiIntent(query);
+      setState(() {
+        _aiAnalysis = res;
+        _isAnalyzingAi = false;
+        if (res['target_mode'] == 'THREE_SHOPS') {
+          _rfqMode = 'MultiShop';
+        } else if (res['target_mode'] == 'SINGLE_SHOP') {
+          _rfqMode = 'SingleShop';
+        } else if (res['target_mode'] == 'BROADCAST' || res['target_mode'] == 'OPEN_NETWORK') {
+          _rfqMode = 'BroadcastNetwork';
+        }
+      });
+      _showSnack(res['reply_message'] ?? 'AI analyzed your list!', Colors.indigoAccent);
+    } catch (e) {
+      setState(() => _isAnalyzingAi = false);
+      _showSnack('AI Agent ready on port 8000: ${e.toString()}', Colors.orange);
+    }
+  }
+
   Future<void> _submitGroceryRfq() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     try {
+      String structuredJson = '[{"item":"Potato","qty":5},{"item":"Onion","qty":2},{"item":"Tomato","qty":1}]';
+      if (_aiAnalysis != null && _aiAnalysis!['items'] != null && (_aiAnalysis!['items'] as List).isNotEmpty) {
+        structuredJson = jsonEncode(_aiAnalysis!['items']);
+      }
       final rfq = await ApiService.createRfq(auth.token!, {
         'mode': _rfqMode,
         'rawPrompt': _groceryPromptController.text.trim(),
-        'structuredItemsJson': '[{"item":"Potato","qty":5},{"item":"Onion","qty":2},{"item":"Tomato","qty":1}]',
+        'structuredItemsJson': structuredJson,
         'deliveryAddress': 'Flat 402, Royal Palms, Jaipur',
         'deliveryLatitude': 26.8520,
         'deliveryLongitude': 75.8230,
@@ -322,12 +353,73 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                           ],
                         ),
                         const SizedBox(height: 14),
-                        ElevatedButton.icon(
-                          onPressed: _submitGroceryRfq,
-                          icon: const Icon(Icons.send),
-                          label: const Text('Send Requirement to Vendors'),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _isAnalyzingAi ? null : _analyzeWithAi,
+                                icon: _isAnalyzingAi
+                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.purpleAccent))
+                                    : const Icon(Icons.auto_awesome, color: Colors.purpleAccent),
+                                label: Text(_isAnalyzingAi ? 'Analyzing...' : 'Parse with AI', style: const TextStyle(color: Colors.purpleAccent)),
+                                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.purpleAccent)),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _submitGroceryRfq,
+                                icon: const Icon(Icons.send),
+                                label: const Text('Send Order/RFQ'),
+                                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white),
+                              ),
+                            ),
+                          ],
                         ),
+                        if (_aiAnalysis != null) ...[
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E1B4B),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.4)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.psychology, color: Colors.purpleAccent, size: 18),
+                                    const SizedBox(width: 6),
+                                    Text('AI Intent: ${_aiAnalysis!['intent_type']}', style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const Spacer(),
+                                    Chip(
+                                      label: Text(_aiAnalysis!['target_mode'] ?? 'OPEN', style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                      backgroundColor: Colors.purple.shade900,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(_aiAnalysis!['reply_message'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                if (_aiAnalysis!['items'] != null && (_aiAnalysis!['items'] as List).isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 4,
+                                    children: (_aiAnalysis!['items'] as List).map<Widget>((it) {
+                                      return Chip(
+                                        backgroundColor: const Color(0xFF312E81),
+                                        label: Text('${it['quantity']} ${it['unit']} ${it['normalized_name']}', style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                         if (_activeRfq != null) ...[
                           const SizedBox(height: 16),
                           Container(

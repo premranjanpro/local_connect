@@ -36,6 +36,7 @@ builder.Services.AddDbContext<TelemetryDbContext>(options =>
 builder.Services.AddScoped<IDistanceMatrixService, HaversineDistanceService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IFcmNotificationService, FcmNotificationService>();
 
 // 3. JWT Authentication Setup
 var jwtSecret = builder.Configuration["Jwt:SecretKey"] ?? "ShopConnectorUltraSecureSecretKey2026!LongEnoughForSha256Signature";
@@ -122,6 +123,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+// 7. Real-time SignalR Hubs
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 // Auto-run EF Migrations and ensure DB schema exists
@@ -149,5 +153,8 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<ShopConnector.Api.Hubs.TaskHub>("/hubs/tasks");
+app.MapHub<ShopConnector.Api.Hubs.TelemetryHub>("/hubs/telemetry");
 
 app.Run();
+

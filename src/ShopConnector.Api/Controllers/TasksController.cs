@@ -3,6 +3,8 @@ using System.Security.Cryptography;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
+using ShopConnector.Api.Hubs;
 using ShopConnector.Core.DTOs;
 using ShopConnector.Core.Entities;
 using ShopConnector.Core.Enums;
@@ -19,16 +21,23 @@ public class TasksController : ControllerBase
     private readonly CoreDbContext _dbContext;
     private readonly IDistanceMatrixService _distanceMatrixService;
     private readonly IAuditService _auditService;
+    private readonly IFcmNotificationService _fcmService;
+    private readonly IHubContext<TaskHub> _taskHub;
 
     public TasksController(
         CoreDbContext dbContext,
         IDistanceMatrixService distanceMatrixService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IFcmNotificationService fcmService,
+        IHubContext<TaskHub> taskHub)
     {
         _dbContext = dbContext;
         _distanceMatrixService = distanceMatrixService;
         _auditService = auditService;
+        _fcmService = fcmService;
+        _taskHub = taskHub;
     }
+
 
     private Guid? GetUserId()
     {
@@ -155,6 +164,45 @@ public class TasksController : ControllerBase
             details: $"{{\"taskType\":\"{task.TaskType}\", \"fare\":{task.FareAmount}, \"paymentMode\":\"{task.PaymentMode}\"}}"
         );
 
+        // 1. Dispatch FCM Push Notification to available drivers
+        try
+        {
+            var driverTokens = await _dbContext.UserDeviceSessions
+                .Include(s => s.User)
+                .Where(s => s.User != null && s.User.Role == UserRole.Driver.ToString() && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .Select(s => s.FcmToken!)
+                .Distinct()
+                .ToListAsync();
+
+            if (driverTokens.Count > 0)
+            {
+                await _fcmService.SendMulticastPushNotificationAsync(
+                    driverTokens,
+                    "New Booking Request!",
+                    $"New {task.TaskType} near {task.PickupAddress}. Estimated Fare: Rs. {task.FareAmount}",
+                    new Dictionary<string, string> { { "taskId", task.Id.ToString() }, { "type", "new_task" } }
+                );
+            }
+        }
+        catch {}
+
+        // 2. Real-time SignalR Broadcast to all drivers
+        try
+        {
+            await _taskHub.Clients.All.SendAsync("OnNewTaskBroadcast", new
+            {
+                taskId = task.Id,
+                taskType = task.TaskType,
+                fare = task.FareAmount,
+                pickupAddress = task.PickupAddress,
+                dropoffAddress = task.DropoffAddress,
+                pickupLat = task.PickupLatitude,
+                pickupLng = task.PickupLongitude,
+                distanceKm = task.DistanceKm
+            });
+        }
+        catch {}
+
         return Ok(task);
     }
 
@@ -255,6 +303,48 @@ public class TasksController : ControllerBase
             details: $"{{\"driverId\":\"{userId.Value}\", \"deviceId\":\"{request.DeviceId}\"}}"
         );
 
+        // 1. Dispatch FCM Push Notification to Customer with Pickup OTP
+        try
+        {
+            var custSession = await _dbContext.UserDeviceSessions
+                .Where(s => s.UserId == task.CustomerId && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .OrderByDescending(s => s.LastActiveAt)
+                .FirstOrDefaultAsync();
+
+            if (custSession != null && !string.IsNullOrEmpty(custSession.FcmToken))
+            {
+                var driver = await _dbContext.Users.FindAsync(userId.Value);
+                await _fcmService.SendPushNotificationAsync(
+                    task.CustomerId,
+                    custSession.FcmToken,
+                    "Driver En Route!",
+                    $"{driver?.FullName ?? "Driver"} is coming to pick you up. Your Pickup OTP is: {task.PickupOtp}",
+                    new Dictionary<string, string> { { "taskId", task.Id.ToString() }, { "otp", task.PickupOtp }, { "type", "task_accepted" } }
+                );
+            }
+        }
+        catch {}
+
+        // 2. Real-time SignalR Event to task group and customer group
+        try
+        {
+            await _taskHub.Clients.Group($"task_{task.Id}").SendAsync("OnTaskStatusChanged", new
+            {
+                taskId = task.Id,
+                status = task.Status,
+                driverId = userId.Value,
+                pickupOtp = task.PickupOtp
+            });
+            await _taskHub.Clients.Group($"user_{task.CustomerId}").SendAsync("OnTaskAccepted", new
+            {
+                taskId = task.Id,
+                status = task.Status,
+                driverId = userId.Value,
+                pickupOtp = task.PickupOtp
+            });
+        }
+        catch {}
+
         return Ok(new { message = "Task accepted successfully.", taskId = task.Id, status = task.Status });
     }
 
@@ -303,6 +393,34 @@ public class TasksController : ControllerBase
             task.Id.ToString(),
             deviceId: request.DeviceId
         );
+
+        // 1. Notify Customer via FCM and SignalR that ride started
+        try
+        {
+            var custSession = await _dbContext.UserDeviceSessions
+                .Where(s => s.UserId == task.CustomerId && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .OrderByDescending(s => s.LastActiveAt)
+                .FirstOrDefaultAsync();
+
+            if (custSession != null && !string.IsNullOrEmpty(custSession.FcmToken))
+            {
+                await _fcmService.SendPushNotificationAsync(
+                    task.CustomerId,
+                    custSession.FcmToken,
+                    "Trip Started!",
+                    $"Your journey has begun. Give Dropoff OTP {task.DropoffOtp} to the driver at your destination.",
+                    new Dictionary<string, string> { { "taskId", task.Id.ToString() }, { "otp", task.DropoffOtp }, { "type", "trip_started" } }
+                );
+            }
+
+            await _taskHub.Clients.Group($"task_{task.Id}").SendAsync("OnTaskStatusChanged", new
+            {
+                taskId = task.Id,
+                status = task.Status,
+                dropoffOtp = task.DropoffOtp
+            });
+        }
+        catch {}
 
         return Ok(new { message = "Pickup verified. Task is now in progress.", status = task.Status });
     }
@@ -401,6 +519,34 @@ public class TasksController : ControllerBase
             deviceId: request.DeviceId,
             details: $"{{\"paymentMode\":\"{task.PaymentMode}\", \"paymentStatus\":\"{task.PaymentStatus}\"}}"
         );
+
+        // 1. Notify Customer via FCM and SignalR that ride is completed
+        try
+        {
+            var custSession = await _dbContext.UserDeviceSessions
+                .Where(s => s.UserId == task.CustomerId && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .OrderByDescending(s => s.LastActiveAt)
+                .FirstOrDefaultAsync();
+
+            if (custSession != null && !string.IsNullOrEmpty(custSession.FcmToken))
+            {
+                await _fcmService.SendPushNotificationAsync(
+                    task.CustomerId,
+                    custSession.FcmToken,
+                    "Ride Completed!",
+                    $"You have arrived at your destination. Total: Rs. {task.FareAmount} ({task.PaymentStatus}). Thank you for riding!",
+                    new Dictionary<string, string> { { "taskId", task.Id.ToString() }, { "fare", task.FareAmount.ToString() }, { "type", "trip_completed" } }
+                );
+            }
+
+            await _taskHub.Clients.Group($"task_{task.Id}").SendAsync("OnTaskStatusChanged", new
+            {
+                taskId = task.Id,
+                status = task.Status,
+                paymentStatus = task.PaymentStatus
+            });
+        }
+        catch {}
 
         return Ok(new
         {

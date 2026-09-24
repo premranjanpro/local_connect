@@ -1,0 +1,36 @@
+# .NET
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.metadata
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.bak
+Thumbs.db
+[Dd]esktop.ini
+
+# Logs & OS
+*.log

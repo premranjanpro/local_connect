@@ -1,0 +1,6 @@
+@ShopConnector.Api_HostAddress = http://localhost:5038
+
+GET {{ShopConnector.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

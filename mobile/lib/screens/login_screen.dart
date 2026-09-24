@@ -205,34 +205,49 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             children: [
                               Expanded(
                                 child: OutlinedButton(
+                                  onPressed: () => _quickFill('9350065724', '1234'),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.purpleAccent),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: EdgeInsets.zero,
+                                  ),
+                                  child: const Text('Admin', style: TextStyle(color: Colors.purpleAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: OutlinedButton(
                                   onPressed: () => _quickFill('9876543210', '1234'),
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.amber),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: EdgeInsets.zero,
                                   ),
-                                  child: const Text('Driver', style: TextStyle(color: Colors.amber, fontSize: 12)),
+                                  child: const Text('Driver', style: TextStyle(color: Colors.amber, fontSize: 11)),
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () => _quickFill('9876543211', '1234'),
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.greenAccent),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: EdgeInsets.zero,
                                   ),
-                                  child: const Text('Merchant', style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                                  child: const Text('Merchant', style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               Expanded(
                                 child: OutlinedButton(
                                   onPressed: () => _quickFill('9876543212', '1234'),
                                   style: OutlinedButton.styleFrom(
                                     side: const BorderSide(color: Colors.blueAccent),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    padding: EdgeInsets.zero,
                                   ),
-                                  child: const Text('Customer', style: TextStyle(color: Colors.blueAccent, fontSize: 12)),
+                                  child: const Text('Customer', style: TextStyle(color: Colors.blueAccent, fontSize: 11)),
                                 ),
                               ),
                             ],

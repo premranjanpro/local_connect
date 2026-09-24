@@ -37,6 +37,7 @@ builder.Services.AddScoped<IDistanceMatrixService, HaversineDistanceService>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IFcmNotificationService, FcmNotificationService>();
+builder.Services.AddScoped<ILiveKitService, LiveKitService>();
 
 // 3. JWT Authentication Setup
 var jwtSecret = builder.Configuration["Jwt:SecretKey"] ?? "ShopConnectorUltraSecureSecretKey2026!LongEnoughForSha256Signature";

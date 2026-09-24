@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
+import 'calling_screen.dart';
 
 class MerchantScreen extends StatefulWidget {
   const MerchantScreen({super.key});
@@ -40,6 +42,14 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
     _tabController = TabController(length: 4, vsync: this);
     _loadMerchantData();
     _loadMerchantRfqs();
+
+    NotificationService.onTaskUpdated = (taskData) {
+      if (mounted) {
+        _loadMerchantData();
+        _loadMerchantRfqs();
+        _showSnack('🔔 Real-time RFQ/Order Update received!', Colors.green);
+      }
+    };
   }
 
   @override
@@ -333,25 +343,50 @@ class _MerchantScreenState extends State<MerchantScreen> with SingleTickerProvid
                               const SizedBox(height: 6),
                               Text('Requested By: ${rfq['customerId'] ?? "Customer"}', style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
                               const SizedBox(height: 12),
-                              if (status != 'OrderCreated')
-                                ElevatedButton.icon(
-                                  onPressed: () => _showQuoteDialog(rfq),
-                                  icon: const Icon(Icons.send_rounded, size: 16),
-                                  label: const Text('Submit Competitive Quote'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.greenAccent.shade700,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              Row(
+                                children: [
+                                  if (status != 'OrderCreated')
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => _showQuoteDialog(rfq),
+                                        icon: const Icon(Icons.send_rounded, size: 16),
+                                        label: const Text('Submit Competitive Quote'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.greenAccent.shade700,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    const Expanded(
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
+                                          SizedBox(width: 6),
+                                          Text('Order finalized.', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.phone_in_talk, color: Colors.greenAccent),
+                                    tooltip: 'Call Customer (VoIP)',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => CallingScreen(
+                                            partnerUserId: rfq['customerId'],
+                                            partnerName: 'Customer (${rfq['customerId'].toString().substring(0, 8)})',
+                                            partnerRole: 'Customer',
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                )
-                              else
-                                const Row(
-                                  children: [
-                                    Icon(Icons.check_circle, color: Colors.greenAccent, size: 16),
-                                    SizedBox(width: 6),
-                                    Text('Customer finalized order from quotes.', style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
+                                ],
+                              ),
                             ],
                           ),
                         ),

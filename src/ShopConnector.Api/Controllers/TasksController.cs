@@ -592,6 +592,64 @@ public class TasksController : ControllerBase
             details: $"{{\"reason\":\"{reason ?? "User cancelled"}\"}}"
         );
 
-        return Ok(new { message = "Task cancelled successfully." });
+        // Dispatch FCM Push Notification on Task Cancellation
+        try
+        {
+            var cancelData = new Dictionary<string, string>
+            {
+                { "type", "task_cancelled" },
+                { "taskId", task.Id.ToString() },
+                { "reason", reason ?? "Task cancelled" },
+                { "timestamp", DateTime.UtcNow.ToString("o") }
+            };
+
+            // Notify Customer
+            var custSession = await _dbContext.UserDeviceSessions
+                .Where(s => s.UserId == task.CustomerId && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                .OrderByDescending(s => s.LastActiveAt)
+                .FirstOrDefaultAsync();
+
+            if (custSession != null && !string.IsNullOrEmpty(custSession.FcmToken))
+            {
+                await _fcmService.SendPushNotificationAsync(
+                    task.CustomerId,
+                    custSession.FcmToken,
+                    "Task Cancelled",
+                    $"Your order/ride #{task.Id.ToString().Substring(0, 8)} was cancelled. Reason: {reason ?? "User cancelled"}",
+                    cancelData
+                );
+            }
+
+            // Notify Driver if assigned
+            if (task.AssignedDriverId.HasValue)
+            {
+                var driverSession = await _dbContext.UserDeviceSessions
+                    .Where(s => s.UserId == task.AssignedDriverId.Value && s.IsActive && !string.IsNullOrEmpty(s.FcmToken))
+                    .OrderByDescending(s => s.LastActiveAt)
+                    .FirstOrDefaultAsync();
+
+                if (driverSession != null && !string.IsNullOrEmpty(driverSession.FcmToken))
+                {
+                    await _fcmService.SendPushNotificationAsync(
+                        task.AssignedDriverId.Value,
+                        driverSession.FcmToken,
+                        "Ride/Delivery Cancelled",
+                        $"Assigned task #{task.Id.ToString().Substring(0, 8)} has been cancelled.",
+                        cancelData
+                    );
+                }
+            }
+
+            // Real-time SignalR Event
+            await _taskHub.Clients.Group($"task_{task.Id}").SendAsync("OnTaskStatusChanged", new
+            {
+                taskId = task.Id,
+                status = task.Status,
+                reason = reason ?? "Task cancelled"
+            });
+        }
+        catch {}
+
+        return Ok(new { message = "Task cancelled successfully.", taskId = task.Id, status = task.Status });
     }
 }

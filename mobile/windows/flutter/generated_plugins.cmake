@@ -3,9 +3,16 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  audioplayers_windows
+  connectivity_plus
+  firebase_core
+  flutter_webrtc
+  livekit_client
+  permission_handler_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  flutter_local_notifications_windows
   jni
 )
 

@@ -321,5 +321,32 @@ class ApiService {
     );
     return jsonDecode(res.body);
   }
+
+  // --- LiveKit VoIP Calling Signaling ---
+  static Future<Map<String, dynamic>> startCall(Map<String, dynamic> body, {String? token}) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/calls/start'),
+      headers: getHeaders(token),
+      body: jsonEncode(body),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> respondCall(String callId, String action, String callerUserId, {String? token}) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/calls/$callId/respond'),
+      headers: getHeaders(token),
+      body: jsonEncode({'action': action, 'callerUserId': callerUserId}),
+    );
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> endCall(String callId, {String? token}) async {
+    final res = await http.post(
+      Uri.parse('$baseUrl/calls/$callId/end'),
+      headers: getHeaders(token),
+    );
+    return jsonDecode(res.body);
+  }
 }
 

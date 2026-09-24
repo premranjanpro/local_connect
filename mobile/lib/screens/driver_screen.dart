@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
+import 'calling_screen.dart';
 
 class DriverScreen extends StatefulWidget {
   const DriverScreen({super.key});
@@ -28,6 +30,13 @@ class _DriverScreenState extends State<DriverScreen> {
   void initState() {
     super.initState();
     _loadDriverData();
+
+    NotificationService.onTaskUpdated = (taskData) {
+      if (mounted) {
+        _loadDriverData();
+        _showSnack('🔔 New dispatch broadcast received!', Colors.amber);
+      }
+    };
   }
 
   @override
@@ -346,9 +355,75 @@ class _DriverScreenState extends State<DriverScreen> {
                       ),
                     ),
                   ),
+                  // 4. Direct VoIP Connect Card
+                  Card(
+                    color: const Color(0xFF1E293B),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.phone_in_talk, color: Colors.greenAccent),
+                              SizedBox(width: 8),
+                              Text('Direct VoIP Quick Connect', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text('Encrypted VoIP calling with customer or neighborhood vendor.', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const CallingScreen(
+                                          partnerUserId: 'c1111111-1111-1111-1111-111111111111',
+                                          partnerName: 'Rahul Verma (Customer)',
+                                          partnerRole: 'Customer',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.person, size: 16),
+                                  label: const Text('Call Customer'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent.shade700, foregroundColor: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const CallingScreen(
+                                          partnerUserId: '7a74b169-0512-4a3b-9f7d-6020832ceaf0',
+                                          partnerName: 'Gupta Super Store',
+                                          partnerRole: 'Shop Owner',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.storefront, size: 16),
+                                  label: const Text('Call Shop'),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.shade700, foregroundColor: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 16),
 
-                  // 4. Intercity Route Banner Creator
+                  // 5. Intercity Route Banner Creator
                   Card(
                     color: const Color(0xFF1E293B),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

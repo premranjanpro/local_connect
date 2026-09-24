@@ -1,0 +1,105 @@
+{
+  "project_info": {
+    "project_number": "384440045082",
+    "project_id": "driver-app-4b351",
+    "storage_bucket": "driver-app-4b351.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384440045082:android:576e24ff2dfcc6eed04ba3",
+        "android_client_info": {
+          "package_name": "com.cabplanner.driverapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR-ribkj8_qXfFPja6g1-0VgZxr0AsvBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384440045082:android:13e070755e54af1ad04ba3",
+        "android_client_info": {
+          "package_name": "com.cabplanner.guestapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR-ribkj8_qXfFPja6g1-0VgZxr0AsvBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384440045082:android:bc4cafc06823c1c0d04ba3",
+        "android_client_info": {
+          "package_name": "com.gindiahr.localsewa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR-ribkj8_qXfFPja6g1-0VgZxr0AsvBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384440045082:android:55893235c7614c49d04ba3",
+        "android_client_info": {
+          "package_name": "com.gindiahr.puruva"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR-ribkj8_qXfFPja6g1-0VgZxr0AsvBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:384440045082:android:3d34c5bb6b59fb78d04ba3",
+        "android_client_info": {
+          "package_name": "hello24.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCR-ribkj8_qXfFPja6g1-0VgZxr0AsvBY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

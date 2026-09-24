@@ -3,9 +3,32 @@ import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/incoming_call_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  await NotificationService.initialize();
+  await NotificationService.initFirebaseMessaging();
+
+  NotificationService.onCallReceived = (callData) {
+    navigatorKey.currentState?.push(
+      MaterialPageRoute(
+        builder: (_) => IncomingCallScreen(
+          callId: callData['callId'] ?? '',
+          callerName: callData['callerName'] ?? 'Unknown Caller',
+          callerRole: callData['callerRole'] ?? 'Caller',
+          callerUserId: callData['callerId'],
+          liveKitUrl: callData['liveKitUrl'],
+          calleeToken: callData['calleeToken'],
+        ),
+      ),
+    );
+  };
+
   runApp(
     MultiProvider(
       providers: [
@@ -22,7 +45,8 @@ class ShopConnectorApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'ShopConnector',
+      navigatorKey: navigatorKey,
+      title: 'LocalConnect',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

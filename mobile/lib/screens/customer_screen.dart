@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/live_tracking_map_widget.dart';
+import 'calling_screen.dart';
 
 class CustomerScreen extends StatefulWidget {
   const CustomerScreen({super.key});
@@ -50,6 +52,17 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
     _loadSubscriptions();
     _loadSocialData();
     _loadBanners();
+
+    NotificationService.onTaskUpdated = (taskData) {
+      if (mounted) {
+        _loadSubscriptions();
+        _loadBanners();
+        if (_activeRfq != null) {
+          _loadRfqQuotes();
+        }
+        _showSnack('🔔 Real-time Update: ${taskData['type'] ?? "Order update"}', Colors.indigoAccent);
+      }
+    };
   }
 
   @override
@@ -96,6 +109,11 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
       });
       setState(() => _activeRideTask = task);
       _showSnack('Ride booked! Pickup OTP: ${task['pickupOtp']}', Colors.green);
+      NotificationService.showOngoingOrderNotification(
+        id: 101,
+        title: '🚗 Driver En Route • OTP: ${task['pickupOtp']}',
+        body: 'Driver assigned! Head to pickup spot: ${_pickupController.text.trim()}',
+      );
     } catch (e) {
       _showSnack(e.toString(), Colors.redAccent);
     }
@@ -361,6 +379,29 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                                 Text('Pickup OTP: ${_activeRideTask!['pickupOtp']} | Dropoff OTP: ${_activeRideTask!['dropoffOtp']}',
                                     style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 Text('Status: ${_activeRideTask!['status']}', style: const TextStyle(color: Colors.white70)),
+                                const SizedBox(height: 8),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => CallingScreen(
+                                          partnerUserId: _activeRideTask!['assignedDriverId'] ?? '7a74b169-0512-4a3b-9f7d-6020832ceaf0',
+                                          partnerName: 'Assigned Driver',
+                                          partnerRole: 'Driver',
+                                          taskId: _activeRideTask!['id'],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.call, size: 16),
+                                  label: const Text('Call Driver (VoIP)'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.greenAccent.shade700,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -556,7 +597,14 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                                         children: [
                                           Expanded(
                                             child: ElevatedButton(
-                                              onPressed: () => _acceptQuote(q['id'], shop, price, 'Cash'),
+                                              onPressed: () {
+                                                _acceptQuote(q['id'], shop, price, 'Cash');
+                                                NotificationService.showOngoingOrderNotification(
+                                                  id: 102,
+                                                  title: '📦 Order Placed with $shop',
+                                                  body: 'Ready in $prep mins • Total ₹${price.toStringAsFixed(0)} (Cash on Delivery)',
+                                                );
+                                              },
                                               style: ElevatedButton.styleFrom(backgroundColor: Colors.greenAccent.shade700, foregroundColor: Colors.white),
                                               child: const Text('Accept Cash'),
                                             ),
@@ -564,10 +612,34 @@ class _CustomerScreenState extends State<CustomerScreen> with SingleTickerProvid
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: OutlinedButton(
-                                              onPressed: () => _acceptQuote(q['id'], shop, price, 'Dues'),
+                                              onPressed: () {
+                                                _acceptQuote(q['id'], shop, price, 'Dues');
+                                                NotificationService.showOngoingOrderNotification(
+                                                  id: 102,
+                                                  title: '📦 Order Placed with $shop (Khata)',
+                                                  body: 'Ready in $prep mins • Added to your neighborhood Khata ledger',
+                                                );
+                                              },
                                               style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.amber)),
                                               child: const Text('Add to Khata', style: TextStyle(color: Colors.amber)),
                                             ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: const Icon(Icons.phone_in_talk, color: Colors.greenAccent),
+                                            tooltip: 'Call $shop',
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) => CallingScreen(
+                                                    partnerUserId: q['businessId'] ?? '7a74b169-0512-4a3b-9f7d-6020832ceaf0',
+                                                    partnerName: shop,
+                                                    partnerRole: 'Shop Owner',
+                                                  ),
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ],
                                       ),

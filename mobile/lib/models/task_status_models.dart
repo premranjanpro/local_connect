@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 // ──────────────────────────────────────────────
@@ -255,6 +256,52 @@ class TaskModel {
       default:
         return Icons.delivery_dining_rounded;
     }
+  }
+
+  String? get businessPhone => raw['businessPhone']?.toString();
+  String? get businessAddress => raw['businessAddress']?.toString();
+  String? get businessCategory => raw['businessCategory']?.toString();
+  double get businessRating => (raw['businessRating'] as num?)?.toDouble() ?? 5.0;
+  bool get requiresShopConfirm => raw['requiresShopConfirm'] == true;
+  DateTime? get shopConfirmedAt => DateTime.tryParse(raw['shopConfirmedAt']?.toString() ?? '');
+  String? get shopRejectionReason => raw['shopRejectionReason']?.toString();
+  bool get isMarketPosted => raw['isMarketPosted'] == true;
+  double? get marketFareOffer => (raw['marketFareOffer'] as num?)?.toDouble();
+  bool get isPickupOtpRequired => raw['isPickupOtpRequired'] != false;
+  bool get isDropOtpRequired => raw['isDropOtpRequired'] != false;
+  DateTime? get cancelledAt => DateTime.tryParse(raw['cancelledAt']?.toString() ?? '');
+  double? get driverLatitude => (raw['driverLatitude'] as num?)?.toDouble();
+  double? get driverLongitude => (raw['driverLongitude'] as num?)?.toDouble();
+  double? get driverHeading => (raw['driverHeading'] as num?)?.toDouble();
+  double? get driverSpeedKmph => (raw['driverSpeedKmph'] as num?)?.toDouble();
+  List<dynamic> get deliveryLogs => (raw['deliveryLogs'] as List?) ?? [];
+  List<dynamic> get stops => (raw['stops'] as List?) ?? [];
+
+  List<Map<String, dynamic>> get parsedOrderItems {
+    final rawItems = raw['orderItems'] ?? raw['items'];
+    if (rawItems == null) return [];
+    if (rawItems is List) {
+      return rawItems.map((e) {
+        if (e is Map<String, dynamic>) return e;
+        return {'name': e.toString(), 'quantity': 1, 'price': 0.0};
+      }).toList();
+    }
+    if (rawItems is String && rawItems.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawItems);
+        if (decoded is List) {
+          return decoded.map((e) {
+            if (e is Map<String, dynamic>) return e;
+            return {'name': e.toString(), 'quantity': 1, 'price': 0.0};
+          }).toList();
+        }
+      } catch (_) {
+        return [
+          {'name': rawItems, 'quantity': 1, 'price': estimatedFare ?? 0.0}
+        ];
+      }
+    }
+    return [];
   }
 }
 

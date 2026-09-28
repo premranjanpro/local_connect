@@ -70,6 +70,9 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
   // Map
   final MapController _mapCtrl = MapController();
   LatLng _driverPos = const LatLng(26.9124, 75.7873);
+  double _driverHeading = 0.0;
+  double _driverSpeed = 0.0;
+  bool _isMapExpanded = false;
   late AnimationController _markerCtrl;
   late Animation<double> _latAnim, _lngAnim;
 
@@ -113,6 +116,14 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
     _task = widget.taskData;
     _lastKnownStatus = _task['status']?.toString() ?? '';
 
+    final initialDriverLat = (_task['driverLatitude'] as num?)?.toDouble();
+    final initialDriverLng = (_task['driverLongitude'] as num?)?.toDouble();
+    if (initialDriverLat != null && initialDriverLng != null) {
+      _driverPos = LatLng(initialDriverLat, initialDriverLng);
+      _driverHeading = (_task['driverHeading'] as num?)?.toDouble() ?? 0.0;
+      _driverSpeed = (_task['driverSpeedKmph'] as num?)?.toDouble() ?? 0.0;
+    }
+
     _markerCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800));
     _latAnim = Tween<double>(begin: _driverPos.latitude, end: _driverPos.latitude)
         .animate(CurvedAnimation(parent: _markerCtrl, curve: Curves.linear));
@@ -139,6 +150,25 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
     _startMqttTracking();
     _startStatusListener();
     _loadDeliveryLog();
+    _refreshTaskData();
+  }
+
+  Future<void> _refreshTaskData() async {
+    try {
+      final updated = await OrderLifecycleApi.getTaskStatus(widget.taskId, widget.token);
+      if (mounted && updated.isNotEmpty) {
+        setState(() {
+          _task = updated;
+          final dLat = (updated['driverLatitude'] as num?)?.toDouble();
+          final dLng = (updated['driverLongitude'] as num?)?.toDouble();
+          final dHead = (updated['driverHeading'] as num?)?.toDouble();
+          final dSpd = (updated['driverSpeedKmph'] as num?)?.toDouble();
+          if (dLat != null && dLng != null) {
+            _animateDriverTo(dLat, dLng, dHead, dSpd);
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -156,7 +186,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
     _mqttSub = MqttService().subscribeToDriverLocation(
       taskId: widget.taskId,
       onLocationUpdate: (lat, lng, bearing, speed) {
-        _animateDriverTo(lat, lng);
+        _animateDriverTo(lat, lng, bearing, speed);
       },
     );
   }
@@ -252,8 +282,10 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
     }
   }
 
-  void _animateDriverTo(double lat, double lng) {
+  void _animateDriverTo(double lat, double lng, [double? heading, double? speed]) {
     if (!mounted) return;
+    if (heading != null) _driverHeading = heading;
+    if (speed != null) _driverSpeed = speed;
     final fromLat = _latAnim.value;
     final fromLng = _lngAnim.value;
     _latAnim = Tween<double>(begin: fromLat, end: lat)
@@ -332,9 +364,11 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
       backgroundColor: const Color(0xFF090D1A),
       body: Stack(
         children: [
-          // ── 40% Map ───────────────────────────────────────────────────────
-          SizedBox(
-            height: MediaQuery.of(context).size.height * 0.42,
+          // ── Map Container (Dynamic Height: 44% or 74% when expanded) ─────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            height: MediaQuery.of(context).size.height * (_isMapExpanded ? 0.74 : 0.44),
             child: FlutterMap(
               mapController: _mapCtrl,
               options: MapOptions(
@@ -345,6 +379,41 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
                 TileLayer(
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.shopconnector.app',
+                ),
+                // ── Geofence 150m Proximity Rings ─────────────────────
+                CircleLayer(
+                  circles: [
+                    CircleMarker(
+                      point: LatLng(pickupLat, pickupLng),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      borderColor: const Color(0xFF10B981),
+                      borderStrokeWidth: 1.5,
+                      useRadiusInMeter: true,
+                      radius: 150,
+                    ),
+                    CircleMarker(
+                      point: LatLng(dropLat, dropLng),
+                      color: const Color(0xFFEF4444).withValues(alpha: 0.15),
+                      borderColor: const Color(0xFFEF4444),
+                      borderStrokeWidth: 1.5,
+                      useRadiusInMeter: true,
+                      radius: 150,
+                    ),
+                  ],
+                ),
+                // ── Route Polyline (Driver -> Pickup -> Drop) ─────────
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: [
+                        LatLng(_latAnim.value, _lngAnim.value),
+                        LatLng(pickupLat, pickupLng),
+                        LatLng(dropLat, dropLng),
+                      ],
+                      strokeWidth: 4.0,
+                      color: const Color(0xFF3B82F6).withValues(alpha: 0.85),
+                    ),
+                  ],
                 ),
                 MarkerLayer(markers: [
                   // ── Multi-stop markers (Merchant sees all, Customer sees own)
@@ -396,50 +465,130 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
                     // ── Single pickup marker ─────────────────────────────
                     Marker(
                       point: LatLng(pickupLat, pickupLng),
-                      width: 36, height: 36,
+                      width: 38, height: 38,
                       child: Container(
                         decoration: const BoxDecoration(
                           color: Color(0xFF6C63FF), shape: BoxShape.circle,
                           boxShadow: [BoxShadow(color: Color(0x446C63FF), blurRadius: 12, spreadRadius: 3)],
                         ),
-                        child: const Icon(Icons.store_rounded, color: Colors.white, size: 20),
+                        child: const Icon(Icons.store_rounded, color: Colors.white, size: 22),
                       ),
                     ),
                     // ── Single drop marker ───────────────────────────────
                     Marker(
                       point: LatLng(dropLat, dropLng),
-                      width: 36, height: 36,
+                      width: 38, height: 38,
                       child: Container(
                         decoration: const BoxDecoration(
                           color: Color(0xFFFF6B6B), shape: BoxShape.circle,
                           boxShadow: [BoxShadow(color: Color(0x44FF6B6B), blurRadius: 12, spreadRadius: 3)],
                         ),
-                        child: const Icon(Icons.home_rounded, color: Colors.white, size: 20),
+                        child: const Icon(Icons.home_rounded, color: Colors.white, size: 22),
                       ),
                     ),
                   ],
 
-                  // ── Animated driver marker ───────────────────────────────
+                  // ── Animated & Rotated Driver Vehicle Marker ─────────────
                   if (status != 'Broadcasting' && status != 'Created')
                     Marker(
                       point: LatLng(_latAnim.value, _lngAnim.value),
-                      width: 44, height: 44,
+                      width: 52, height: 52,
                       child: ScaleTransition(
                         scale: _pulseAnim,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2563EB),
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(
-                              color: const Color(0xFF6C63FF).withOpacity(0.5),
-                              blurRadius: 16, spreadRadius: 4,
-                            )],
-                          ),
-                          child: const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 22),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 44, height: 44,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2.5),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF2563EB).withValues(alpha: 0.5),
+                                    blurRadius: 16, spreadRadius: 4,
+                                  ),
+                                ],
+                              ),
+                              child: Transform.rotate(
+                                angle: (_driverHeading * math.pi / 180),
+                                child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 24),
+                              ),
+                            ),
+                            if (_driverSpeed > 0)
+                              Positioned(
+                                bottom: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0F172A),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: Text(
+                                    '${_driverSpeed.toStringAsFixed(0)} km/h',
+                                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ),
                 ]),
+              ],
+            ),
+          ),
+
+          // ── Map Floating Controls (Expand, Center on Driver/Store) ───────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 56,
+            right: 16,
+            child: Column(
+              children: [
+                GestureDetector(
+                  onTap: () => setState(() => _isMapExpanded = !_isMapExpanded),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: Icon(
+                      _isMapExpanded ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _mapCtrl.move(LatLng(_latAnim.value, _lngAnim.value), 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF2563EB)),
+                    ),
+                    child: const Icon(Icons.my_location_rounded, color: Color(0xFF3B82F6), size: 20),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () => _mapCtrl.move(LatLng(pickupLat, pickupLng), 16),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B).withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF6C63FF)),
+                    ),
+                    child: const Icon(Icons.storefront_rounded, color: Color(0xFF6C63FF), size: 20),
+                  ),
+                ),
               ],
             ),
           ),

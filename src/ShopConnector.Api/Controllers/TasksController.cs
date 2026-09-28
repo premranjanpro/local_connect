@@ -19,6 +19,7 @@ namespace ShopConnector.Api.Controllers;
 public class TasksController : ControllerBase
 {
     private readonly CoreDbContext _dbContext;
+    private readonly TelemetryDbContext _telemetryDb;
     private readonly IDistanceMatrixService _distanceMatrixService;
     private readonly IAuditService _auditService;
     private readonly IFcmNotificationService _fcmService;
@@ -26,12 +27,14 @@ public class TasksController : ControllerBase
 
     public TasksController(
         CoreDbContext dbContext,
+        TelemetryDbContext telemetryDb,
         IDistanceMatrixService distanceMatrixService,
         IAuditService auditService,
         IFcmNotificationService fcmService,
         IHubContext<TaskHub> taskHub)
     {
         _dbContext = dbContext;
+        _telemetryDb = telemetryDb;
         _distanceMatrixService = distanceMatrixService;
         _auditService = auditService;
         _fcmService = fcmService;
@@ -254,14 +257,87 @@ public class TasksController : ControllerBase
             }
         }
 
+        var currentUserId = GetUserId();
+        bool isCustomer = currentUserId.HasValue && task.CustomerId == currentUserId.Value;
+        bool isMerchant = currentUserId.HasValue && task.Business != null && task.Business.MerchantId == currentUserId.Value;
+        bool isDriver = currentUserId.HasValue && task.AssignedDriverId == currentUserId.Value;
+
+        // Driver Live Telemetry from TelemetryDbContext
+        double? driverLatitude = null;
+        double? driverLongitude = null;
+        double? driverHeading = null;
+        double? driverSpeedKmph = null;
+        DateTime? driverLastPingAt = null;
+
+        if (task.AssignedDriverId.HasValue)
+        {
+            try
+            {
+                var driverLoc = await _telemetryDb.DriverLocationCurrent.FindAsync(task.AssignedDriverId.Value);
+                if (driverLoc != null)
+                {
+                    driverLatitude = driverLoc.Latitude;
+                    driverLongitude = driverLoc.Longitude;
+                    driverHeading = driverLoc.Heading;
+                    driverSpeedKmph = driverLoc.Speed;
+                    driverLastPingAt = driverLoc.UpdatedAt;
+                }
+            }
+            catch {}
+        }
+
+        // Delivery timeline logs
+        var logs = await _dbContext.TaskDeliveryLogs
+            .Where(l => l.TaskId == id)
+            .OrderBy(l => l.OccurredAt)
+            .Select(l => new
+            {
+                l.Id,
+                l.EventType,
+                l.FromStatus,
+                l.ToStatus,
+                LoggedAt = l.OccurredAt,
+                l.Notes,
+                Latitude = l.DriverLat,
+                Longitude = l.DriverLng,
+                DistanceMeters = l.DistanceFromExpectedMeters,
+                l.GeofenceStatus
+            })
+            .ToListAsync();
+
+        // Multi-stop data if present
+        var stops = await _dbContext.TaskStops
+            .Where(s => s.TaskId == id)
+            .OrderBy(s => s.StopSequence)
+            .Select(s => new
+            {
+                s.Id,
+                SequenceOrder = s.StopSequence,
+                s.StopType,
+                s.Address,
+                s.Latitude,
+                s.Longitude,
+                ContactName = s.RecipientLabel,
+                ContactPhone = s.RecipientPhone,
+                s.Status,
+                s.CompletedAt
+            })
+            .ToListAsync();
+
         return Ok(new
         {
             task.Id,
             task.CustomerId,
             CustomerName = task.Customer?.FullName,
             CustomerPhone = task.Customer?.Phone,
+            CustomerAvatarUrl = task.Customer?.AvatarUrl,
             task.BusinessId,
             BusinessName = task.Business?.Name,
+            BusinessPhone = task.Business?.Phone,
+            BusinessAddress = task.Business?.Address,
+            BusinessCategory = task.Business?.Category,
+            BusinessRating = task.Business?.Rating ?? 5.0m,
+            BusinessMerchantId = task.Business?.MerchantId,
             task.AssignedDriverId,
             DriverName = task.AssignedDriver?.FullName,
             DriverPhone = task.AssignedDriver?.Phone,
@@ -273,6 +349,11 @@ public class TasksController : ControllerBase
             VehicleColor = activeVehicle?.Color,
             VehiclePhotoUrl = activeVehicle?.PhotoUrl,
             VehicleType = activeVehicle?.VehicleType,
+            DriverLatitude = driverLatitude,
+            DriverLongitude = driverLongitude,
+            DriverHeading = driverHeading,
+            DriverSpeedKmph = driverSpeedKmph,
+            DriverLastPingAt = driverLastPingAt,
             Driver = task.AssignedDriver == null ? null : new
             {
                 Id = task.AssignedDriver.Id,
@@ -281,6 +362,10 @@ public class TasksController : ControllerBase
                 AvatarUrl = task.AssignedDriver.AvatarUrl,
                 DlNumber = driverProfile?.LicenseNumber,
                 Rating = driverProfile?.Rating ?? 4.9m,
+                Latitude = driverLatitude,
+                Longitude = driverLongitude,
+                Heading = driverHeading,
+                Speed = driverSpeedKmph,
                 Vehicle = activeVehicle == null ? null : new
                 {
                     Id = activeVehicle.Id,
@@ -300,8 +385,15 @@ public class TasksController : ControllerBase
             task.DropoffAddress,
             task.DropoffLatitude,
             task.DropoffLongitude,
-            PickupOtp = task.CustomerId == GetUserId() ? task.PickupOtp : null,
-            DropoffOtp = task.CustomerId == GetUserId() ? task.DropoffOtp : null,
+            PickupOtp = (isCustomer || isMerchant) ? task.PickupOtp : null,
+            DropoffOtp = isCustomer ? task.DropoffOtp : null,
+            task.IsPickupOtpRequired,
+            task.IsDropOtpRequired,
+            task.RequiresShopConfirm,
+            task.ShopConfirmedAt,
+            task.ShopRejectionReason,
+            task.IsMarketPosted,
+            task.MarketFareOffer,
             task.DistanceKm,
             task.DurationMinutes,
             task.FareAmount,
@@ -310,7 +402,10 @@ public class TasksController : ControllerBase
             task.OrderItems,
             task.CreatedAt,
             task.AcceptedAt,
-            task.CompletedAt
+            task.CompletedAt,
+            task.CancelledAt,
+            DeliveryLogs = logs,
+            Stops = stops
         });
     }
 

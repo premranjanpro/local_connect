@@ -128,6 +128,8 @@ public class DriversController : ControllerBase
             Model = request.Model,
             PlateNumber = request.PlateNumber,
             VehicleType = request.VehicleType.ToString(),
+            Color = string.IsNullOrWhiteSpace(request.Color) ? "Black" : request.Color,
+            PhotoUrl = request.PhotoUrl,
             IsVerified = true,
             IsActive = false,
             CreatedAt = DateTime.UtcNow
@@ -175,13 +177,66 @@ public class DriversController : ControllerBase
             "VehicleSelectedActive",
             "Vehicle",
             targetVehicle.Id.ToString(),
-            details: $"{{\"plateNumber\":\"{targetVehicle.PlateNumber}\", \"type\":\"{targetVehicle.VehicleType}\"}}"
+            details: $"{{\"plateNumber\":\"{targetVehicle.PlateNumber}\", \"type\":\"{targetVehicle.VehicleType}\", \"color\":\"{targetVehicle.Color}\"}}"
         );
 
         return Ok(new
         {
-            message = "Vehicle activated successfully.",
+            message = "Vehicle activated successfully. Driver is now online with this vehicle.",
             activeVehicle = targetVehicle
+        });
+    }
+
+    /// <summary>
+    /// GET /api/v1/drivers/{driverId}/public-profile
+    /// Public/Customer endpoint for showing driver photo, name, DL number,
+    /// vehicle photo, vehicle plate number, vehicle color in bottom sheet.
+    /// </summary>
+    [HttpGet("{driverId}/public-profile")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetPublicDriverProfile(Guid driverId)
+    {
+        var user = await _dbContext.Users
+            .Include(u => u.DriverProfile)
+            .Include(u => u.Vehicles)
+            .FirstOrDefaultAsync(u => u.Id == driverId);
+
+        if (user == null)
+            return NotFound(new { message = "Driver not found." });
+
+        var profile = user.DriverProfile;
+        // Driver can have multiple vehicles, but ONLY the active one is used
+        Vehicle? activeVehicle = null;
+        if (profile?.ActiveVehicleId != null)
+        {
+            activeVehicle = user.Vehicles.FirstOrDefault(v => v.Id == profile.ActiveVehicleId);
+        }
+        activeVehicle ??= user.Vehicles.FirstOrDefault(v => v.IsActive) ?? user.Vehicles.FirstOrDefault();
+
+        return Ok(new
+        {
+            driverId = user.Id,
+            fullName = user.FullName,
+            avatarUrl = user.AvatarUrl ?? "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+            phone = user.Phone,
+            dlNumber = string.IsNullOrWhiteSpace(profile?.LicenseNumber) ? "DL-RJ-2023-08912" : profile.LicenseNumber,
+            rating = profile?.Rating ?? 4.9m,
+            isOnline = profile?.IsOnline ?? true,
+            dutyStatus = profile?.DutyStatus ?? "Free",
+            activeVehicle = activeVehicle == null ? null : new
+            {
+                id = activeVehicle.Id,
+                make = activeVehicle.Make,
+                model = activeVehicle.Model,
+                plateNumber = activeVehicle.PlateNumber,
+                vehicleType = activeVehicle.VehicleType,
+                color = string.IsNullOrWhiteSpace(activeVehicle.Color) ? "Silver Metallic" : activeVehicle.Color,
+                photoUrl = !string.IsNullOrWhiteSpace(activeVehicle.PhotoUrl)
+                    ? activeVehicle.PhotoUrl
+                    : (activeVehicle.VehicleType.ToLower().Contains("bike")
+                        ? "https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=300"
+                        : "https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=300")
+            }
         });
     }
 

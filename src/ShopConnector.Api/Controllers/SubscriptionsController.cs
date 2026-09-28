@@ -226,4 +226,102 @@ public class SubscriptionsController : ControllerBase
             totalSubscriptions = subs.Count
         });
     }
+
+    [AllowAnonymous]
+    [HttpGet("catalog")]
+    public IActionResult GetSubscriptionCatalog()
+    {
+        var plans = new[]
+        {
+            new
+            {
+                id = "plan-cow-milk",
+                category = "Daily Milk",
+                itemName = "Pure Farm Cow Milk (Desi Gir)",
+                unit = "litre",
+                quantity = 1.0,
+                pricePerDelivery = 65.0,
+                deliverySlot = "06:00 - 07:30 AM",
+                icon = "🥛",
+                description = "Raw, chilled, non-homogenized pure cow milk delivered to your doorstep every morning."
+            },
+            new
+            {
+                id = "plan-buffalo-milk",
+                category = "Daily Milk",
+                itemName = "Fresh Buffalo Milk (High Fat)",
+                unit = "litre",
+                quantity = 1.0,
+                pricePerDelivery = 72.0,
+                deliverySlot = "06:00 - 07:30 AM",
+                icon = "🥛",
+                description = "Creamy thick buffalo milk, perfect for tea, coffee, curd, and homemade paneer."
+            },
+            new
+            {
+                id = "plan-veg-thali",
+                category = "Tiffin Service",
+                itemName = "Homestyle Veg Thali (4 Roti, Dal, Sabzi, Rice)",
+                unit = "tiffin",
+                quantity = 1.0,
+                pricePerDelivery = 110.0,
+                deliverySlot = "12:30 - 01:30 PM",
+                icon = "🍱",
+                description = "Healthy, home-cooked lunch with low oil, freshly prepared and delivered hot in insulated tiffin."
+            },
+            new
+            {
+                id = "plan-breakfast-basket",
+                category = "Morning Essentials",
+                itemName = "Bread, Farm Eggs & Butter Basket",
+                unit = "basket",
+                quantity = 1.0,
+                pricePerDelivery = 85.0,
+                deliverySlot = "06:30 - 07:30 AM",
+                icon = "🍞",
+                description = "Brown/White bread loaf, 6 farm-fresh brown eggs, and Amul butter pack."
+            },
+            new
+            {
+                id = "plan-water-can",
+                category = "Drinking Water",
+                itemName = "20L RO Purified Mineral Water Can",
+                unit = "can",
+                quantity = 1.0,
+                pricePerDelivery = 45.0,
+                deliverySlot = "08:00 - 10:00 AM",
+                icon = "💧",
+                description = "Chilled / normal RO purified 20 litre bubble-top water can delivered and placed at your dispenser."
+            }
+        };
+
+        return Ok(plans);
+    }
+
+    [HttpGet("merchant/{businessId}")]
+    public async Task<IActionResult> GetMerchantSubscriptions(Guid businessId)
+    {
+        var subs = await _dbContext.Subscriptions
+            .Include(s => s.Customer)
+            .Where(s => s.BusinessId == businessId && s.IsActive)
+            .OrderBy(s => s.DeliverySlot)
+            .Select(s => new
+            {
+                s.Id,
+                s.ItemName,
+                s.Quantity,
+                s.Unit,
+                s.DeliverySlot,
+                s.DaysOfWeek,
+                s.PricePerDelivery,
+                CustomerName = s.Customer != null ? s.Customer.FullName : "Customer",
+                CustomerPhone = s.Customer != null ? s.Customer.Phone : "",
+                DeliveryAddress = "Vaishali Nagar Sector 3, Jaipur",
+                s.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(subs);
+    }
 }
+

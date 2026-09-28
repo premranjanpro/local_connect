@@ -54,6 +54,26 @@ public class DriverProfile
     [Column("last_heartbeat_at")]
     public DateTime? LastHeartbeatAt { get; set; }
 
+    [Column("last_location_at")]
+    public DateTime? LastLocationAt { get; set; }
+
+    [Column("is_online")]
+    public bool IsOnline { get; set; } = false;
+
+    /// <summary>IDLE | RIDE — determines GPS ping interval (60s vs 15s)</summary>
+    [MaxLength(10)]
+    [Column("tracking_mode")]
+    public string TrackingMode { get; set; } = "IDLE";
+
+    [Column("rating", TypeName = "decimal(3,2)")]
+    public decimal Rating { get; set; } = 5.0m;
+
+    [Column("rating_count")]
+    public int RatingCount { get; set; } = 0;
+
+    [Column("is_verified")]
+    public bool IsVerified { get; set; } = false;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

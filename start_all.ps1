@@ -104,11 +104,23 @@ if (Test-PortListening 5000) {
     }
 }
 
-# 5. Summary & Interactive Menu
+# 5. Launch React Admin Dashboard
+$DashboardDir = Join-Path $WorkspaceRoot "dashboard"
+if (Test-Path (Join-Path $DashboardDir "package.json")) {
+    Write-Host "[5/5] Starting React Admin Dashboard (Port 3000)..." -ForegroundColor Cyan
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force; cd '$DashboardDir'; npm run dev"
+    Start-Sleep -Seconds 3
+    Write-Host "       Admin Dashboard online at http://localhost:3000" -ForegroundColor Green
+} else {
+    Write-Host "[5/5] Dashboard not found — run 'npm install' in /dashboard first." -ForegroundColor Yellow
+}
+
+# 6. Summary & Interactive Menu
 Write-Host "------------------------------------------------------------------" -ForegroundColor DarkGray
 Write-Host " All Core Backend Services are Online!" -ForegroundColor Green
-Write-Host " API Docs / Swagger : http://localhost:5000/swagger" -ForegroundColor Cyan
-Write-Host " AI Microservice    : http://127.0.0.1:8000/docs" -ForegroundColor Cyan
+Write-Host " API Docs / Swagger  : http://localhost:5000/swagger" -ForegroundColor Cyan
+Write-Host " AI Microservice     : http://127.0.0.1:8000/docs" -ForegroundColor Cyan
+Write-Host " Admin Dashboard     : http://localhost:3000" -ForegroundColor Cyan
 Write-Host "------------------------------------------------------------------" -ForegroundColor DarkGray
 
 if ($SkipAppLaunch) {
@@ -122,10 +134,11 @@ Write-Host "  [1] Launch Flutter Desktop (Windows Native App)" -ForegroundColor 
 Write-Host "  [2] Launch Flutter Web (Chrome)" -ForegroundColor White
 Write-Host "  [3] Open Swagger UI in Browser" -ForegroundColor White
 Write-Host "  [4] Open AI Agent Documentation" -ForegroundColor White
+Write-Host "  [5] Open Admin Dashboard in Browser" -ForegroundColor White
 Write-Host "  [Q] Exit Launcher (Keep Services Running)" -ForegroundColor White
 Write-Host ""
 
-$choice = Read-Host "Enter your choice [1-4 or Q]"
+$choice = Read-Host "Enter your choice [1-5 or Q]"
 $MobileDir = Join-Path $WorkspaceRoot "mobile"
 
 switch ($choice) {
@@ -142,6 +155,9 @@ switch ($choice) {
     }
     "4" {
         Start-Process "http://127.0.0.1:8000/docs"
+    }
+    "5" {
+        Start-Process "http://localhost:3000"
     }
     Default {
         Write-Host "Exiting Launcher. Background services are active in their separate consoles." -ForegroundColor Green

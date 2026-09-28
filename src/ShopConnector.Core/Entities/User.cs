@@ -44,6 +44,12 @@ public class User
     [Column("avatar_url")]
     public string? AvatarUrl { get; set; }
 
+    [Column("customer_rating", TypeName = "decimal(3,2)")]
+    public decimal CustomerRating { get; set; } = 5.0m;
+
+    [Column("rating_count")]
+    public int RatingCount { get; set; } = 0;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

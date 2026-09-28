@@ -56,6 +56,12 @@ public class Business
     [Column("allowed_payment_modes")]
     public string AllowedPaymentModes { get; set; } = "Cash,Online,Dues";
 
+    [Column("rating", TypeName = "decimal(3,2)")]
+    public decimal Rating { get; set; } = 5.0m;
+
+    [Column("rating_count")]
+    public int RatingCount { get; set; } = 0;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

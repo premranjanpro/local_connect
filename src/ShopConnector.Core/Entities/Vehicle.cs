@@ -14,6 +14,9 @@ public class Vehicle
     [Column("driver_id")]
     public Guid DriverId { get; set; }
 
+    [Column("business_id")]
+    public Guid? BusinessId { get; set; }
+
     [Required]
     [MaxLength(50)]
     [Column("make")]
@@ -33,6 +36,14 @@ public class Vehicle
     [MaxLength(20)]
     [Column("vehicle_type")]
     public string VehicleType { get; set; } = string.Empty;
+
+    [MaxLength(50)]
+    [Column("color")]
+    public string Color { get; set; } = string.Empty;
+
+    [MaxLength(500)]
+    [Column("photo_url")]
+    public string? PhotoUrl { get; set; }
 
     [Column("is_verified")]
     public bool IsVerified { get; set; } = false;

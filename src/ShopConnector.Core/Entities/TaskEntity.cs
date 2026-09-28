@@ -85,6 +85,52 @@ public class TaskEntity
     [Column("order_items")]
     public string? OrderItems { get; set; }
 
+    // ── Shop Owner Review / Confirm Workflow ──────────────────────────────
+    /// <summary>Shop owner must confirm order before driver assignment</summary>
+    [Column("requires_shop_confirm")]
+    public bool RequiresShopConfirm { get; set; } = false;
+
+    /// <summary>Shop confirmed the order — moves from Pending → Broadcasting</summary>
+    [Column("shop_confirmed_at")]
+    public DateTime? ShopConfirmedAt { get; set; }
+
+    [Column("shop_confirmed_by")]
+    public Guid? ShopConfirmedBy { get; set; }
+
+    [Column("shop_rejection_reason")]
+    [MaxLength(200)]
+    public string? ShopRejectionReason { get; set; }
+
+    // ── OTP Policy (both independently optional per task) ─────────────────
+    [Column("is_pickup_otp_required")]
+    public bool IsPickupOtpRequired { get; set; } = true;
+
+    [Column("is_drop_otp_required")]
+    public bool IsDropOtpRequired { get; set; } = true;
+
+    // ── Market Driver Post ────────────────────────────────────────────────
+    /// <summary>Shop owner posted task to open market drivers (not just dedicated fleet)</summary>
+    [Column("is_market_posted")]
+    public bool IsMarketPosted { get; set; } = false;
+
+    [Column("market_posted_at")]
+    public DateTime? MarketPostedAt { get; set; }
+
+    /// <summary>Market driver offered fare (shop owner can set incentive)</summary>
+    [Column("market_fare_offer", TypeName = "decimal(10,2)")]
+    public decimal? MarketFareOffer { get; set; }
+
+    // ── Soft Delete (Customer can delete PENDING/BROADCASTING tasks only) ──
+    [Column("is_deleted")]
+    public bool IsDeleted { get; set; } = false;
+
+    [Column("deleted_at")]
+    public DateTime? DeletedAt { get; set; }
+
+    [Column("deleted_by")]
+    public Guid? DeletedBy { get; set; }
+
+    // ── Timestamps ────────────────────────────────────────────────────────
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
@@ -93,6 +139,9 @@ public class TaskEntity
 
     [Column("completed_at")]
     public DateTime? CompletedAt { get; set; }
+
+    [Column("cancelled_at")]
+    public DateTime? CancelledAt { get; set; }
 
     [ForeignKey(nameof(CustomerId))]
     public virtual User? Customer { get; set; }
@@ -104,4 +153,7 @@ public class TaskEntity
     public virtual User? AssignedDriver { get; set; }
 
     public virtual ICollection<TaskAssignment> Assignments { get; set; } = new List<TaskAssignment>();
+    public virtual ICollection<TaskDeliveryLog> DeliveryLogs { get; set; } = new List<TaskDeliveryLog>();
+    public virtual ICollection<TaskStop> Stops { get; set; } = new List<TaskStop>();
 }
+

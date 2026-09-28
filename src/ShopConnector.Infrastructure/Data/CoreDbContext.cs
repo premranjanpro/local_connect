@@ -30,6 +30,16 @@ public class CoreDbContext : DbContext
     public DbSet<CommunityClassified> CommunityClassifieds => Set<CommunityClassified>();
     public DbSet<AuditActionLog> AuditActionLogs => Set<AuditActionLog>();
     public DbSet<MessageDispatchLog> MessageDispatchLogs => Set<MessageDispatchLog>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<TaskDeliveryLog> TaskDeliveryLogs => Set<TaskDeliveryLog>();
+    public DbSet<WebhookSubscription> WebhookSubscriptions => Set<WebhookSubscription>();
+    public DbSet<TaskStop> TaskStops => Set<TaskStop>();
+    public DbSet<NotificationQueueItem> NotificationQueue => Set<NotificationQueueItem>();
+    public DbSet<OfflineEventBatch> OfflineEventBatches => Set<OfflineEventBatch>();
+    public DbSet<RideSession> RideSessions => Set<RideSession>();
+    public DbSet<RideTask> RideTasks => Set<RideTask>();
+    public DbSet<TaskRating> TaskRatings => Set<TaskRating>();
+    public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -112,5 +122,18 @@ public class CoreDbContext : DbContext
         // Message Dispatch Logs
         modelBuilder.Entity<MessageDispatchLog>()
             .HasIndex(m => m.RecipientUserId);
+
+        // Chat Messages
+        modelBuilder.Entity<ChatMessage>()
+            .HasIndex(c => c.RoomKey);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasIndex(c => c.CreatedAt);
+
+        modelBuilder.Entity<ChatMessage>()
+            .HasOne(c => c.Sender)
+            .WithMany()
+            .HasForeignKey(c => c.SenderId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

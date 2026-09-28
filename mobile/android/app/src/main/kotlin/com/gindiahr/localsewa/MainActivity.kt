@@ -1,4 +1,4 @@
-package com.shopconnector.shop_connector_app
+package com.gindiahr.localsewa
 
 import io.flutter.embedding.android.FlutterActivity
 

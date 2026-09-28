@@ -48,6 +48,16 @@ dependencies:
   audioplayers: ^6.8.1
   livekit_client: ^2.3.6
   mqtt_client: ^10.5.2
+  image_picker: ^1.1.2
+  record: ^6.0.0
+  flutter_tts: ^4.2.3
+  # Offline-first engine
+  sqflite: ^2.4.2           # Local SQLite for GPS + event buffering
+  connectivity_plus: ^6.1.4  # Network state detection
+  geolocator: ^13.0.3        # GPS position stream
+  path_provider: ^2.1.5      # File paths for SQLite DB
+  share_plus: ^11.0.0        # Share live tracking links via WhatsApp / system share
+  url_launcher: ^6.3.1       # Phone dialing and browser opening
 
 dev_dependencies:
   flutter_test:

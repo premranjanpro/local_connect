@@ -45,6 +45,23 @@ builder.Services.AddSingleton<ShopConnector.Api.Services.Mqtt.MqttLocationIngest
 builder.Services.AddSingleton<IMqttPublisher>(sp => sp.GetRequiredService<ShopConnector.Api.Services.Mqtt.MqttLocationIngestionService>());
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ShopConnector.Api.Services.Mqtt.MqttLocationIngestionService>());
 
+// 2.2 Morning Subscription Auto-Dispatch Worker (Daily 04:30 UTC = 10:00 AM IST)
+builder.Services.AddHostedService<ShopConnector.Api.Services.Workers.SubscriptionDispatchWorker>();
+
+// 2.3 Webhook Delivery Service (fires HTTP POST to registered endpoints)
+builder.Services.AddHttpClient("webhook", c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(8);
+    c.DefaultRequestHeaders.Add("User-Agent", "ShopConnector-Webhook/1.0");
+});
+builder.Services.AddScoped<ShopConnector.Api.Services.IWebhookService, ShopConnector.Api.Services.WebhookService>();
+
+// 2.4 Notification Queue & Retry Worker (30s polling, exponential back-off)
+// Guarantees delivery even when driver is offline — preserves original event timestamps
+builder.Services.AddScoped<ShopConnector.Api.Services.INotificationEnqueueService,
+    ShopConnector.Api.Services.NotificationEnqueueService>();
+builder.Services.AddHostedService<ShopConnector.Api.Services.Workers.NotificationRetryWorker>();
+
 // 3. JWT Authentication Setup
 var jwtSecret = builder.Configuration["Jwt:SecretKey"] ?? "ShopConnectorUltraSecureSecretKey2026!LongEnoughForSha256Signature";
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "ShopConnectorApi";
@@ -162,6 +179,7 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ShopConnector.Api.Hubs.TaskHub>("/hubs/tasks");
 app.MapHub<ShopConnector.Api.Hubs.TelemetryHub>("/hubs/telemetry");
+app.MapHub<ShopConnector.Api.Hubs.ChatHub>("/hubs/chat");
 
 app.Run();
 

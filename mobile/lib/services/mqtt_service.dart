@@ -46,6 +46,7 @@ class MqttLocationUpdate {
 class MqttService {
   static final MqttService _instance = MqttService._internal();
   factory MqttService() => _instance;
+  static MqttService get instance => _instance;
   MqttService._internal();
 
   MqttServerClient? _client;
@@ -55,7 +56,11 @@ class MqttService {
   final StreamController<MqttLocationUpdate> _locationController =
       StreamController<MqttLocationUpdate>.broadcast();
 
+  final StreamController<Map<String, dynamic>> _taskStatusController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
   Stream<MqttLocationUpdate> get locationStream => _locationController.stream;
+  Stream<Map<String, dynamic>> get taskStatusStream => _taskStatusController.stream;
   bool get isConnected => _isConnected && _client?.connectionStatus?.state == MqttConnectionState.connected;
 
   static String get defaultBrokerHost {
@@ -121,9 +126,14 @@ class MqttService {
         try {
           final data = jsonDecode(payloadString);
           if (data is Map<String, dynamic>) {
-            final update = MqttLocationUpdate.fromJson(data);
-            _locationController.add(update);
-            debugPrint('[MQTT] Received live telemetry for driver ${update.driverId}: lat=${update.latitude}, lng=${update.longitude}');
+            if (data.containsKey('status') || msg.topic.contains('status')) {
+              _taskStatusController.add(data);
+            }
+            if (data.containsKey('latitude') || data.containsKey('lat')) {
+              final update = MqttLocationUpdate.fromJson(data);
+              _locationController.add(update);
+              debugPrint('[MQTT] Received live telemetry for driver ${update.driverId}: lat=${update.latitude}, lng=${update.longitude}');
+            }
           }
         } catch (e) {
           debugPrint('[MQTT] Failed to parse message on ${msg.topic}: $e');
@@ -199,6 +209,33 @@ class MqttService {
       debugPrint('[MQTT] Publish error: $e');
       return false;
     }
+  }
+
+  /// Subscribe to live driver tracking for the Share-to-Track flow.
+  /// Listens on topic: tracking/v1/default/driver/{driverId}/location
+  /// If taskId is provided, also maps updates from tracking/{tenantId}/driver/{driverId}/location.
+  StreamSubscription<MqttLocationUpdate>? subscribeToDriverLocation({
+    required String taskId,
+    required void Function(double lat, double lng, double bearing, double speed) onLocationUpdate,
+    String tenantId = 'default',
+  }) {
+    // Subscribe to both topic formats for compatibility
+    final topicA = 'tracking/v1/$tenantId/task/$taskId/location';
+    final topicB = 'tasks/$taskId/tracking';
+    subscribe(topicA);
+    subscribe(topicB);
+
+    // Return a subscription handle so caller can cancel it on dispose
+    return locationStream.listen((update) {
+      if (update.taskId == taskId || update.taskId == null) {
+        onLocationUpdate(
+          update.latitude,
+          update.longitude,
+          update.heading,
+          update.speed,
+        );
+      }
+    });
   }
 
   void disconnect() {

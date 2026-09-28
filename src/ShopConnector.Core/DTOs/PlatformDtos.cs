@@ -51,7 +51,9 @@ public record AddVehicleRequest(
     [Required] string Make,
     [Required] string Model,
     [Required] string PlateNumber,
-    [Required] VehicleType VehicleType
+    [Required] VehicleType VehicleType,
+    string? Color = "Black",
+    string? PhotoUrl = null
 );
 
 public record CreateIntercityBannerRequest(
@@ -208,3 +210,87 @@ public record DriverGpsPingRequest(
     int BatteryPct,
     bool IsCharging
 );
+
+// --- Merchant Direct Order & Team Management DTOs ---
+public record CreateMerchantDirectOrderRequest(
+    [Required] Guid BusinessId,
+    [Required] string CustomerName,
+    [Required] string CustomerPhone,
+    string? CustomerAddress,
+    string? PickupAddress,
+    double? PickupLatitude,
+    double? PickupLongitude,
+    [Required] string DropoffAddress,
+    double? DropoffLatitude,
+    double? DropoffLongitude,
+    [Required] decimal FareAmount,
+    [Required] string PaymentMode,
+    string? OrderItemsJson,
+    Guid? AssignedDriverId
+);
+
+public record AssignDriverToTaskRequest(
+    [Required] Guid DriverId
+);
+
+public record AddShopDeliveryBoyDto(
+    [Required] string Name,
+    [Required] string Phone,
+    string? VehicleType,
+    string? VehicleNumber,
+    string? PhotoUrl,
+    string? DlNumber
+);
+
+public record AddShopCustomerDto(
+    [Required] string Name,
+    [Required] string Phone,
+    string? Address,
+    bool IsDuesAllowed,
+    decimal CreditLimit,
+    string? PhotoUrl
+);
+
+public record AddShopVehicleDto(
+    [Required] string Make,
+    [Required] string Model,
+    [Required] string PlateNumber,
+    [Required] string VehicleType,
+    string? Color,
+    string? PhotoUrl,
+    Guid? DriverId
+);
+
+public record AssignDriverVehicleDto(
+    [Required] Guid DriverId,
+    [Required] Guid VehicleId
+);
+
+// --- School Transit DTOs ---
+public record CreateSchoolTransitScheduleRequest(
+    [Required] string StudentName,
+    [Required] string SchoolName,
+    string? StudentPhone,
+    [Required] string PickupAddress,
+    double PickupLatitude,
+    double PickupLongitude,
+    string? SchoolAddress,
+    double SchoolLatitude,
+    double SchoolLongitude,
+    TimeSpan PickupTime,
+    Guid? DriverId,
+    decimal MonthlyFee
+);
+
+public record UpdateSchoolTransitStatusRequest(
+    [Required] string Status, // BoardedVan, AtSchool, OnWayHome, DroppedHome
+    string? Notes
+);
+
+public record SchoolTransitSosRequest(
+    [Required] string AlertMessage,
+    double? Latitude,
+    double? Longitude
+);
+
+

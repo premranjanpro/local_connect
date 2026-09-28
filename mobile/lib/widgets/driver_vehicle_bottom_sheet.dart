@@ -174,8 +174,7 @@ class DriverVehicleBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E293B), Color(0xFF111827)],
+              color: const Color(0xFF1E293B), Color(0xFF111827)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -314,8 +313,7 @@ class DriverVehicleBottomSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E293B), Color(0xFF1E1E2E)],
+              color: const Color(0xFF1E293B), Color(0xFF1E1E2E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

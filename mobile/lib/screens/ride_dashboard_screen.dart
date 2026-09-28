@@ -372,9 +372,7 @@ class _RideDashboardScreenState extends State<RideDashboardScreen>
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF6C63FF).withOpacity(0.15), const Color(0xFF3ECFCF).withOpacity(0.08)],
-        ),
+        color: const Color(0xFF2563EB).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.25)),
       ),
@@ -740,9 +738,7 @@ class _RideDashboardScreenState extends State<RideDashboardScreen>
         scale: _pulseAnim,
         child: Container(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
-            ),
+            color: const Color(0xFF2563EB),
             shape: BoxShape.circle,
             boxShadow: [BoxShadow(
               color: const Color(0xFF6C63FF).withOpacity(0.5),

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -6,14 +5,18 @@ import '../providers/notification_store.dart';
 import '../services/api_service.dart';
 import '../services/notification_service.dart';
 import '../models/task_status_models.dart';
-import '../widgets/task_detail_cards.dart';
-import '../widgets/live_tracking_map_widget.dart';
-import '../widgets/driver_vehicle_bottom_sheet.dart';
+import '../widgets/app_menu_drawer.dart';
 import '../widgets/order_rating_bottom_sheet.dart';
 import 'calling_screen.dart';
 import 'notification_center_screen.dart';
 import 'task_booking_details_screen.dart';
-import '../widgets/app_menu_drawer.dart';
+import 'shops_near_me_screen.dart';
+import 'shop_detail_page.dart';
+import 'all_orders_tasks_screen.dart';
+import 'subscriptions_transit_screen.dart';
+import 'share_track_screen.dart';
+import 'create_broadcast_page.dart';
+import 'profile_screen.dart';
 
 class CustomerDashboard extends StatefulWidget {
   const CustomerDashboard({super.key});
@@ -22,209 +25,104 @@ class CustomerDashboard extends StatefulWidget {
   State<CustomerDashboard> createState() => _CustomerDashboardState();
 }
 
-class _CustomerDashboardState extends State<CustomerDashboard>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _CustomerDashboardState extends State<CustomerDashboard> {
+  // ── State variables ──
+  List<TaskModel> _myTasks = [];
+  bool _loadingTasks = false;
 
-  // ── Rides ──
-  final _pickupCtrl =
-      TextEditingController(text: 'Sindhi Camp, Jaipur');
-  final _dropCtrl =
-      TextEditingController(text: 'Malviya Nagar, Jaipur');
-  Map<String, dynamic>? _fareEstimate;
-  Map<String, dynamic>? _activeRide;
-  bool _estimating = false;
+  List<dynamic> _nearbyShops = [];
+  bool _loadingShops = false;
 
-  // ── Grocery ──
-  final _groceryCtrl = TextEditingController(
-      text: 'Mujhe 5kg aaloo, 2 kg pyaj, 1 kg tomato chahiye');
-  String _rfqMode = 'SingleShop';
-  Map<String, dynamic>? _activeRfq;
-  Map<String, dynamic>? _aiAnalysis;
-  bool _analyzingAi = false;
-  List<dynamic> _rfqQuotes = [];
-  bool _loadingQuotes = false;
-
-  // ── Subscriptions ──
-  List<dynamic> _subs = [];
-  bool _loadingSubs = false;
-
-  // ── Banners ──
   List<dynamic> _banners = [];
   bool _loadingBanners = false;
 
-  // ── My Orders (all tasks) ──
-  List<TaskModel> _myTasks = [];
-  bool _loadingTasks = false;
-  TaskStatus? _filterStatus;
+  List<dynamic> _subscriptions = [];
+  bool _loadingSubs = false;
 
-  // ── Stats ──
-  DashboardStats _stats = const DashboardStats();
+  String _currentAddress = 'Sindhi Camp, Jaipur';
+
+  // Quick Voice/Search controller
+  final _searchCtrl = TextEditingController();
+  final _groceryVoiceCtrl = TextEditingController(
+      text: '5kg aaloo, 2 kg pyaj, 1 kg tomato, 1L sarso tel');
+  bool _analyzingAi = false;
+  Map<String, dynamic>? _aiAnalysis;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
-    _loadAll();
+    _loadAllData();
     NotificationService.onTaskUpdated = (d) {
       if (mounted) {
-        _loadAll();
-        _showSnack('🔔 ${d['type'] ?? 'Order update'}', const Color(0xFF6366F1));
+        _loadTasks();
+        _showSnack('🔔 ${d['title'] ?? d['type'] ?? 'Order update'}',
+            const Color(0xFF6366F1));
       }
     };
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
-    _pickupCtrl.dispose();
-    _dropCtrl.dispose();
-    _groceryCtrl.dispose();
+    _searchCtrl.dispose();
+    _groceryVoiceCtrl.dispose();
     super.dispose();
   }
 
-  void _loadAll() {
-    _loadSubs();
+  void _loadAllData() {
+    _loadTasks();
+    _loadNearbyShops();
     _loadBanners();
-    _loadMyTasks();
+    _loadSubscriptions();
   }
 
-  // ─────────────────────────── Loaders ─────────────────────────────
-
-  Future<void> _loadMyTasks() async {
+  Future<void> _loadTasks() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAuthenticated) return;
     setState(() => _loadingTasks = true);
-    // Simulate with mock data when backend not ready
     try {
-      await ApiService.getMySubscriptions(auth.token!);
-      // Real endpoint would be: GET /api/v1/tasks/my
-      // For now we build mock tasks from subs
-      final mocks = _buildMockTasks();
+      final res = await ApiService.getMyTasks(auth.token!);
+      if (res.isNotEmpty) {
+        final tasks = res.map((m) => TaskModel.fromJson(m)).toList();
+        if (mounted) {
+          setState(() {
+            _myTasks = tasks;
+            _loadingTasks = false;
+          });
+        }
+        return;
+      }
+    } catch (_) {}
+
+    // Fallback realistic mock data for smooth offline/dev experience
+    if (mounted) {
       setState(() {
-        _myTasks = mocks;
-        _stats = DashboardStats.fromTasks(mocks);
-        _loadingTasks = false;
-      });
-    } catch (_) {
-      final mocks = _buildMockTasks();
-      setState(() {
-        _myTasks = mocks;
-        _stats = DashboardStats.fromTasks(mocks);
+        _myTasks = _buildMockTasks();
         _loadingTasks = false;
       });
     }
   }
 
-  List<TaskModel> _buildMockTasks() {
-    return [
-      TaskModel.fromJson({
-        'id': 'cab-001-pending',
-        'taskType': 'MobilityRide',
-        'status': 'pending',
-        'pickupAddress': 'Sindhi Camp Bus Stand, Jaipur',
-        'dropoffAddress': 'Malviya Nagar Metro Station',
-        'estimatedFare': 120,
-        'createdAt': DateTime.now().subtract(const Duration(minutes: 3)).toIso8601String(),
-        'paymentMode': 'Cash',
-      }),
-      TaskModel.fromJson({
-        'id': 'cab-002-assigned',
-        'taskType': 'MobilityRide',
-        'status': 'assigned',
-        'pickupAddress': 'C-Scheme, Jaipur',
-        'dropoffAddress': 'Vaishali Nagar',
-        'estimatedFare': 85,
-        'driverName': 'Deepak Yadav',
-        'driverAvatarUrl': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
-        'driverDlNumber': 'DL-1420110012345',
-        'driverRating': 4.9,
-        'vehicleType': 'Bike',
-        'vehiclePlateNumber': 'RJ14-SC-7890',
-        'vehicleColor': 'Flame Red',
-        'vehicleMakeModel': 'Hero Splendor Plus',
-        'vehiclePhotoUrl': 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=500',
-        'pickupOtp': '4821',
-        'createdAt': DateTime.now().subtract(const Duration(minutes: 12)).toIso8601String(),
-      }),
-      TaskModel.fromJson({
-        'id': 'groc-001-ongoing',
-        'taskType': 'GroceryDelivery',
-        'status': 'ongoing',
-        'pickupAddress': 'Gupta Kirana Store, Vaishali',
-        'dropoffAddress': 'Flat 402, Royal Palms, Jaipur',
-        'estimatedFare': 245,
-        'shopName': 'Gupta Kirana Store',
-        'driverName': 'Mohit Kumar',
-        'driverAvatarUrl': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300',
-        'driverDlNumber': 'DL-1420180098765',
-        'driverRating': 4.7,
-        'vehicleType': 'Auto',
-        'vehiclePlateNumber': 'RJ14-TR-5566',
-        'vehicleColor': 'Yellow & Green',
-        'vehicleMakeModel': 'Bajaj RE Compact Auto',
-        'vehiclePhotoUrl': 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=500',
-        'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
-        'items': [
-          {'item': 'Aaloo 5kg'},
-          {'item': 'Pyaj 2kg'},
-          {'item': 'Tomato 1kg'}
-        ],
-      }),
-      TaskModel.fromJson({
-        'id': 'cab-003-completed',
-        'taskType': 'MobilityRide',
-        'status': 'completed',
-        'pickupAddress': 'Jaipur Airport',
-        'dropoffAddress': 'Hotel Rajmahal, MI Road',
-        'estimatedFare': 350,
-        'driverName': 'Deepak Yadav',
-        'driverAvatarUrl': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
-        'driverDlNumber': 'DL-1420110012345',
-        'driverRating': 4.8,
-        'vehicleType': 'CabSedan',
-        'vehiclePlateNumber': 'RJ14-CP-1234',
-        'vehicleColor': 'Arctic White',
-        'vehicleMakeModel': 'Maruti Suzuki Swift',
-        'vehiclePhotoUrl': 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?w=500',
-        'createdAt': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
-        'completedAt': DateTime.now().subtract(const Duration(hours: 1, minutes: 30)).toIso8601String(),
-      }),
-      TaskModel.fromJson({
-        'id': 'groc-002-completed',
-        'taskType': 'GroceryDelivery',
-        'status': 'completed',
-        'pickupAddress': 'Fresh Mart, Tonk Road',
-        'dropoffAddress': 'Flat 201, Shiv Vihar Colony',
-        'estimatedFare': 180,
-        'shopName': 'Fresh Mart',
-        'createdAt': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-        'completedAt': DateTime.now().subtract(const Duration(hours: 22)).toIso8601String(),
-      }),
-      TaskModel.fromJson({
-        'id': 'cab-004-cancelled',
-        'taskType': 'MobilityRide',
-        'status': 'cancelled',
-        'pickupAddress': 'Gopalpura Bypass',
-        'dropoffAddress': 'Durgapura Railway Station',
-        'estimatedFare': 70,
-        'createdAt': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String(),
-      }),
-    ];
-  }
-
-  Future<void> _loadSubs() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    if (!auth.isAuthenticated) return;
-    setState(() => _loadingSubs = true);
+  Future<void> _loadNearbyShops() async {
+    setState(() => _loadingShops = true);
     try {
-      final subs = await ApiService.getMySubscriptions(auth.token!);
-      setState(() {
-        _subs = subs;
-        _loadingSubs = false;
-      });
+      final shops = await ApiService.getNearbyShops(
+        lat: 26.9124,
+        lng: 75.7873,
+        radiusKm: 5.0,
+      );
+      if (mounted) {
+        setState(() {
+          _nearbyShops = shops;
+          _loadingShops = false;
+        });
+      }
     } catch (_) {
-      setState(() => _loadingSubs = false);
+      if (mounted) {
+        setState(() {
+          _nearbyShops = _buildMockShops();
+          _loadingShops = false;
+        });
+      }
     }
   }
 
@@ -232,1395 +130,2094 @@ class _CustomerDashboardState extends State<CustomerDashboard>
     setState(() => _loadingBanners = true);
     try {
       final b = await ApiService.getIntercityBanners();
-      setState(() {
-        _banners = b;
-        _loadingBanners = false;
-      });
+      if (mounted) {
+        setState(() {
+          _banners = b;
+          _loadingBanners = false;
+        });
+      }
     } catch (_) {
-      setState(() => _loadingBanners = false);
-    }
-  }
-
-  // ─────────────────────────── Actions ─────────────────────────────
-
-  Future<void> _estimateRide() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    setState(() => _estimating = true);
-    try {
-      final res = await ApiService.estimateTask(
-          auth.token ?? '', 26.9200, 75.7900, 26.8500, 75.8200, 'MobilityRide');
-      setState(() {
-        _fareEstimate = res;
-        _estimating = false;
-      });
-    } catch (e) {
-      setState(() => _estimating = false);
-      _showSnack(e.toString(), Colors.redAccent);
-    }
-  }
-
-  Future<void> _bookRide() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    try {
-      final task = await ApiService.createTask(auth.token!, {
-        'taskType': 'MobilityRide',
-        'pickupAddress': _pickupCtrl.text.trim(),
-        'pickupLatitude': 26.9200,
-        'pickupLongitude': 75.7900,
-        'dropoffAddress': _dropCtrl.text.trim(),
-        'dropoffLatitude': 26.8500,
-        'dropoffLongitude': 75.8200,
-        'paymentMode': 'Cash',
-      });
-      setState(() => _activeRide = task);
-      _showSnack('Ride booked! OTP: ${task['pickupOtp']}', const Color(0xFF10B981));
-      _loadMyTasks();
-    } catch (e) {
-      _showSnack(e.toString(), Colors.redAccent);
-    }
-  }
-
-  Future<void> _analyzeAi() async {
-    final q = _groceryCtrl.text.trim();
-    if (q.isEmpty) return;
-    setState(() => _analyzingAi = true);
-    try {
-      final res = await ApiService.parseAiIntent(q);
-      setState(() {
-        _aiAnalysis = res;
-        _analyzingAi = false;
-        final mode = res['target_mode'];
-        if (mode == 'THREE_SHOPS') {
-          _rfqMode = 'MultiShop';
-        } else if (mode == 'SINGLE_SHOP') {
-          _rfqMode = 'SingleShop';
-        } else if (mode == 'BROADCAST') {
-          _rfqMode = 'BroadcastNetwork';
-        }
-      });
-    } catch (e) {
-      setState(() => _analyzingAi = false);
-      _showSnack('AI: ${e.toString()}', Colors.orange);
-    }
-  }
-
-  Future<void> _submitGrocery() async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    try {
-      String itemsJson =
-          '[{"item":"Potato","qty":5},{"item":"Onion","qty":2},{"item":"Tomato","qty":1}]';
-      if (_aiAnalysis?['items'] != null &&
-          (_aiAnalysis!['items'] as List).isNotEmpty) {
-        itemsJson = jsonEncode(_aiAnalysis!['items']);
+      if (mounted) {
+        setState(() {
+          _banners = _buildMockBanners();
+          _loadingBanners = false;
+        });
       }
-      final rfq = await ApiService.createRfq(auth.token!, {
-        'mode': _rfqMode,
-        'rawPrompt': _groceryCtrl.text.trim(),
-        'structuredItemsJson': itemsJson,
-        'deliveryAddress': 'Flat 402, Royal Palms, Jaipur',
-        'deliveryLatitude': 26.8520,
-        'deliveryLongitude': 75.8230,
-      });
-      setState(() => _activeRfq = rfq);
-      _showSnack('Grocery request sent!', const Color(0xFF3B82F6));
-    } catch (e) {
-      _showSnack(e.toString(), Colors.redAccent);
     }
   }
 
-  Future<void> _loadRfqQuotes() async {
-    if (_activeRfq == null) return;
+  Future<void> _loadSubscriptions() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    setState(() => _loadingQuotes = true);
+    if (!auth.isAuthenticated) return;
+    setState(() => _loadingSubs = true);
     try {
-      final res = await ApiService.getRfq(auth.token!, _activeRfq!['id']);
-      setState(() {
-        _rfqQuotes = res['quotes'] ?? [];
-        _loadingQuotes = false;
-      });
-    } catch (e) {
-      setState(() => _loadingQuotes = false);
-      _showSnack(e.toString(), Colors.redAccent);
-    }
-  }
-
-  Future<void> _acceptQuote(String qId, String shop, double price, String mode) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    try {
-      await ApiService.acceptRfqQuote(auth.token!, _activeRfq!['id'], qId, mode);
-      _showSnack('Order placed with $shop!', const Color(0xFF10B981));
-      await _loadRfqQuotes();
-    } catch (e) {
-      _showSnack(e.toString(), Colors.redAccent);
-    }
-  }
-
-  Future<void> _toggleVacation(String subId, bool isPaused) async {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    try {
-      if (isPaused) {
-        await ApiService.resumeSubscription(auth.token!, subId);
-        _showSnack('Delivery resumed!', const Color(0xFF10B981));
-      } else {
-        final now = DateTime.now();
-        final s = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-        final e = '${now.year}-${now.month.toString().padLeft(2, '0')}-${(now.day + 5).toString().padLeft(2, '0')}';
-        await ApiService.pauseSubscription(auth.token!, subId, s, e, 'Vacation');
-        _showSnack('Vacation Mode: 5 days paused', const Color(0xFFF59E0B));
+      final subs = await ApiService.getMySubscriptions(auth.token!);
+      if (mounted) {
+        setState(() {
+          _subscriptions = subs;
+          _loadingSubs = false;
+        });
       }
-      _loadSubs();
-    } catch (e) {
-      _showSnack(e.toString(), Colors.redAccent);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _subscriptions = _buildMockSubs();
+          _loadingSubs = false;
+        });
+      }
+    }
+  }
+
+  // Active Task: The most urgent ongoing task
+  TaskModel? get _activeHeroTask {
+    try {
+      return _myTasks.firstWhere((t) =>
+          t.status == TaskStatus.assign ||
+          t.status == TaskStatus.ongoing ||
+          t.status == TaskStatus.pending);
+    } catch (_) {
+      return null;
     }
   }
 
   void _showSnack(String msg, Color bg) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg), backgroundColor: bg));
+        SnackBar(
+          content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold)),
+          backgroundColor: bg,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
     }
   }
 
-  // ─────────────────────────── Build ───────────────────────────────
-
   String _greeting() {
     final h = DateTime.now().hour;
-    if (h < 12) return '🌅 Good Morning';
-    if (h < 17) return '☀️ Good Afternoon';
-    if (h < 20) return '🌇 Good Evening';
-    return '🌙 Good Night';
+    if (h < 12) return 'Good Morning 🌅';
+    if (h < 17) return 'Good Afternoon ☀️';
+    if (h < 20) return 'Good Evening 🌇';
+    return 'Good Night 🌙';
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final auth = Provider.of<AuthProvider>(context);
+    final notifs = Provider.of<NotificationStore>(context);
+
+    // Curated dynamic theme palette
+    final bg = theme.scaffoldBackgroundColor;
+    final cardBg = isDark ? const Color(0xFF151F32) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF050A15),
+      backgroundColor: bg,
       drawer: const AppMenuDrawer(activeItem: 'Dashboard'),
-      body: NestedScrollView(
-        headerSliverBuilder: (ctx, _) => [_buildSliverHeader(auth)],
-        body: Column(
-          children: [
-            _buildTabBar(),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildMyOrdersTab(),
-                  _buildRidesTab(),
-                  _buildGroceryTab(),
-                  _buildSubscriptionsTab(),
-                  _buildBannersTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Premium Stat Pills ─────────────────────────────────────────────
-  Widget _buildStatPills() {
-    return Row(
-      children: [
-        _statPill(_stats.pending.toString(), 'Pending', const Color(0xFFF59E0B), Icons.schedule_rounded),
-        const SizedBox(width: 7),
-        _statPill(_stats.assigned.toString(), 'Active', const Color(0xFF3B82F6), Icons.person_pin_rounded),
-        const SizedBox(width: 7),
-        _statPill(_stats.ongoing.toString(), 'Ongoing', const Color(0xFF8B5CF6), Icons.local_shipping_rounded),
-        const SizedBox(width: 7),
-        _statPill(_stats.completed.toString(), 'Done', const Color(0xFF10B981), Icons.check_circle_rounded),
-        const SizedBox(width: 7),
-        _statPill(_stats.cancelled.toString(), 'Cancel', const Color(0xFFEF4444), Icons.cancel_rounded),
-      ],
-    );
-  }
-
-  Widget _statPill(String val, String label, Color color, IconData icon) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [color.withValues(alpha: 0.22), color.withValues(alpha: 0.06)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
-          boxShadow: [BoxShadow(color: color.withValues(alpha: 0.1), blurRadius: 8)],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(val, style: TextStyle(
-                color: color, fontWeight: FontWeight.w800, fontSize: 16, height: 1.1)),
-            const SizedBox(height: 2),
-            Text(label, style: const TextStyle(
-                color: Colors.white38, fontSize: 8.5, fontWeight: FontWeight.w500),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Quick Shortcuts ────────────────────────────────────────────────
-  Widget _buildQuickShortcuts() {
-    final shortcuts = [
-      (Icons.local_taxi_rounded, 'Book\nRide', const Color(0xFF3B82F6), 1),
-      (Icons.shopping_basket_rounded, 'Grocery', const Color(0xFF10B981), 2),
-      (Icons.repeat_rounded, 'Daily\nSubs', const Color(0xFF8B5CF6), 3),
-      (Icons.alt_route_rounded, 'Intercity', const Color(0xFFFF9F43), 4),
-      (Icons.campaign_rounded, 'Broadcast', const Color(0xFFEC4899), 0),
-    ];
-    return SizedBox(
-      height: 88,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: shortcuts.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) {
-          final s = shortcuts[i];
-          return GestureDetector(
-            onTap: () => _tabController.animateTo(s.$4),
-            child: Container(
-              width: 72,
-              decoration: BoxDecoration(
-                color: s.$3.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: s.$3.withValues(alpha: 0.25)),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [s.$3.withValues(alpha: 0.3), s.$3.withValues(alpha: 0.1)],
-                        begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(s.$1, color: s.$3, size: 20),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(s.$2, textAlign: TextAlign.center,
-                      style: TextStyle(color: s.$3, fontSize: 9.5,
-                          fontWeight: FontWeight.w600, height: 1.2)),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Premium Order Card ─────────────────────────────────────────────
-  Widget _buildPremiumOrderCard(TaskModel t) {
-    final statusColor = t.status.color;
-    final taskIcon = _taskTypeIcon(t.taskType);
-    final taskLabel = _taskTypeLabel(t.taskType);
-    final fare = t.estimatedFare?.toStringAsFixed(0) ?? '—';
-    final timeAgo = _timeAgo(t.createdAt);
-
-    return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(
-        builder: (_) => TaskBookingDetailsScreen(
-          taskId: t.id, userRole: 'Customer', initialTask: t),
-      )),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF0E1626),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: statusColor.withValues(alpha: 0.18)),
-          boxShadow: [BoxShadow(
-              color: statusColor.withValues(alpha: 0.06),
-              blurRadius: 16, offset: const Offset(0, 4))],
-        ),
-        child: IntrinsicHeight(
-          child: Row(
-            children: [
-              // Left colored status bar
-              Container(
-                width: 4,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [statusColor, statusColor.withValues(alpha: 0.3)],
-                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    bottomLeft: Radius.circular(18),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Icon box
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(colors: [
-                      statusColor.withValues(alpha: 0.25),
-                      statusColor.withValues(alpha: 0.08),
-                    ], begin: Alignment.topLeft, end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.2)),
-                  ),
-                  child: Center(child: Text(taskIcon,
-                      style: const TextStyle(fontSize: 20))),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Content
-              Expanded(
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () async => _loadAllData(),
+          color: const Color(0xFF38BDF8),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // ── 1. Top App Header ──────────────────────────────────────────
+              SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(child: Text(taskLabel, style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-                              maxLines: 1, overflow: TextOverflow.ellipsis)),
-                          Text('₹$fare', style: TextStyle(
-                              color: statusColor, fontWeight: FontWeight.w800, fontSize: 14)),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      _routeRow(const Color(0xFF10B981), t.pickupAddress ?? 'Pickup point'),
-                      const SizedBox(height: 3),
-                      _routeRow(const Color(0xFFEF4444), t.dropoffAddress ?? 'Drop point'),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      Builder(
+                        builder: (ctx) => GestureDetector(
+                          onTap: () => Scaffold.of(ctx).openDrawer(),
+                          child: Container(
+                            padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: cardBorder),
                             ),
-                            child: Row(children: [
-                              Icon(t.status.icon, color: statusColor, size: 10),
-                              const SizedBox(width: 4),
-                              Text(t.status.label, style: TextStyle(
-                                  color: statusColor, fontSize: 10, fontWeight: FontWeight.bold)),
-                            ]),
+                            child: Icon(Icons.menu_rounded, color: textPrimary, size: 20),
                           ),
-                          Text(timeAgo, style: const TextStyle(
-                              color: Colors.white24, fontSize: 10)),
-                        ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.only(right: 12),
-                child: Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 18),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _routeRow(Color dot, String text) {
-    return Row(children: [
-      Container(width: 7, height: 7,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-      const SizedBox(width: 5),
-      Expanded(child: Text(text,
-          style: const TextStyle(color: Colors.white54, fontSize: 11),
-          maxLines: 1, overflow: TextOverflow.ellipsis)),
-    ]);
-  }
-
-  String _taskTypeIcon(String? type) {
-    switch (type) {
-      case 'MobilityRide': return '🚕';
-      case 'GroceryDelivery': return '🛒';
-      case 'SubscriptionDelivery': return '🔄';
-      case 'Intercity': return '🚌';
-      default: return '📦';
-    }
-  }
-
-  String _taskTypeLabel(String? type) {
-    switch (type) {
-      case 'MobilityRide': return 'Mobility Ride';
-      case 'GroceryDelivery': return 'Grocery Delivery';
-      case 'SubscriptionDelivery': return 'Subscription Delivery';
-      case 'Intercity': return 'Intercity Trip';
-      default: return 'Delivery Order';
-    }
-  }
-
-  String _timeAgo(DateTime? dt) {
-    if (dt == null) return '';
-    final diff = DateTime.now().difference(dt);
-    if (diff.inDays > 0) return '${diff.inDays}d ago';
-    if (diff.inHours > 0) return '${diff.inHours}h ago';
-    return '${diff.inMinutes}m ago';
-  }
-
-  // ── Premium Sliver Header ──────────────────────────────────────────
-  Widget _buildSliverHeader(AuthProvider auth) {
-    final name = auth.fullName ?? 'User';
-    final initials = name.length >= 2
-        ? '${name[0]}${name.split(' ').length > 1 ? name.split(' ').last[0] : name[1]}'.toUpperCase()
-        : name[0].toUpperCase();
-
-    return SliverAppBar(
-      expandedHeight: 230,
-      floating: false,
-      pinned: true,
-      elevation: 0,
-      backgroundColor: const Color(0xFF050A15),
-      leading: Builder(
-        builder: (ctx) => IconButton(
-          icon: const Icon(Icons.menu_rounded, color: Colors.white),
-          onPressed: () => Scaffold.of(ctx).openDrawer(),
-        ),
-      ),
-      actions: [
-        Consumer<NotificationStore>(
-          builder: (_, store, __) => Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.notifications_outlined,
-                    color: Colors.white, size: 24),
-                onPressed: () => Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const NotificationCenterScreen())),
-              ),
-              if (store.unreadCount > 0)
-                Positioned(
-                  top: 8, right: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                        color: Color(0xFFEF4444), shape: BoxShape.circle),
-                    child: Text(
-                      store.unreadCount > 9 ? '9+' : '${store.unreadCount}',
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 4),
-      ],
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.parallax,
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color(0xFF0F0C29),
-                Color(0xFF1A1060),
-                Color(0xFF050A15),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Stack(
-            children: [
-              // Mesh glow orbs
-              Positioned(
-                top: -40, right: -30,
-                child: Container(
-                  width: 180, height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [const Color(0xFF6C63FF).withValues(alpha: 0.35), Colors.transparent],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 20, left: -20,
-                child: Container(
-                  width: 140, height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [const Color(0xFF3ECFCF).withValues(alpha: 0.25), Colors.transparent],
-                    ),
-                  ),
-                ),
-              ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top row: greeting + avatar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Column(
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _showAddressPicker,
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                _greeting(),
-                                style: const TextStyle(
-                                    color: Colors.white60, fontSize: 13,
-                                    fontWeight: FontWeight.w500, letterSpacing: 0.3),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                    color: Colors.white, fontSize: 24,
-                                    fontWeight: FontWeight.w800, letterSpacing: -0.5),
-                              ),
-                              const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  Container(
-                                    width: 6, height: 6,
-                                    decoration: const BoxDecoration(
-                                        color: Color(0xFF10B981), shape: BoxShape.circle),
+                                  const Icon(Icons.location_on_rounded,
+                                      color: Color(0xFFEF4444), size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Delivering To',
+                                    style: TextStyle(
+                                      color: textSecondary,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                  const SizedBox(width: 5),
-                                  const Text('Vaishali Nagar, Jaipur',
-                                      style: TextStyle(
-                                          color: Colors.white38, fontSize: 11,
-                                          fontWeight: FontWeight.w400)),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.keyboard_arrow_down_rounded,
+                                      color: textSecondary, size: 16),
                                 ],
+                              ),
+                              Text(
+                                _currentAddress,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
-                          // Avatar
-                          Container(
-                            width: 52, height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
-                                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF6C63FF).withValues(alpha: 0.4),
-                                  blurRadius: 16, spreadRadius: 2,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Notifications Icon with badge
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const NotificationCenterScreen()),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Icon(Icons.notifications_none_rounded,
+                                  color: textPrimary, size: 20),
+                              if (notifs.unreadCount > 0)
+                                Positioned(
+                                  top: -4,
+                                  right: -4,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(3),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFEF4444),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    constraints: const BoxConstraints(
+                                        minWidth: 15, minHeight: 15),
+                                    child: Text(
+                                      '${notifs.unreadCount}',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ),
                                 ),
-                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Profile Avatar
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ProfileScreen()),
+                        ),
+                        child: CircleAvatar(
+                          radius: 19,
+                          backgroundColor: const Color(0xFF38BDF8).withValues(alpha: 0.2),
+                          child: Text(
+                            auth.fullName?.isNotEmpty == true
+                                ? auth.fullName![0].toUpperCase()
+                                : 'U',
+                            style: const TextStyle(
+                              color: Color(0xFF38BDF8),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
                             ),
-                            child: Center(
-                              child: Text(initials,
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 18,
-                                      fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              if (_loadingTasks || _loadingShops || _loadingSubs || _loadingBanners)
+                const SliverToBoxAdapter(
+                  child: LinearProgressIndicator(
+                    minHeight: 2,
+                    color: Color(0xFF38BDF8),
+                    backgroundColor: Colors.transparent,
+                  ),
+                ),
+
+              // ── 2. Greeting & Search / Voice Bar ──────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_greeting()}, ${auth.fullName?.split(' ').first ?? 'Friend'} 👋',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Search and Voice mic bar
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: cardBg,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: cardBorder),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search_rounded,
+                                color: Color(0xFF38BDF8), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchCtrl,
+                                style: TextStyle(color: textPrimary, fontSize: 14),
+                                decoration: InputDecoration(
+                                  hintText: 'Search vegetables, cabs, kirana...',
+                                  hintStyle: TextStyle(color: textSecondary, fontSize: 13),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                onSubmitted: (val) {
+                                  if (val.trim().isNotEmpty) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const ShopsNearMeScreen(),
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                            ),
+                            Container(
+                              height: 24,
+                              width: 1,
+                              color: cardBorder,
+                              margin: const EdgeInsets.symmetric(horizontal: 6),
+                            ),
+                            // Glowing mic icon for Voice Grocery
+                            GestureDetector(
+                              onTap: _showVoiceGroceryModal,
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.mic_rounded,
+                                    color: Color(0xFF10B981), size: 20),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // ── 3. HERO Active Task / Ride Card (if any active) ────────────
+              if (_activeHeroTask != null)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    child: _buildHeroActiveTaskCard(
+                        _activeHeroTask!, cardBg, cardBorder, textPrimary, textSecondary),
+                  ),
+                ),
+
+              // ── 4. Four Core Services Grid ─────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'What would you like to do?',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            'Local Services',
+                            style: TextStyle(color: textSecondary, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _serviceCard(
+                              title: 'Book a Ride',
+                              subtitle: 'Cabs, Auto & Bikes',
+                              icon: Icons.local_taxi_rounded,
+                              accentColor: const Color(0xFF38BDF8),
+                              badge: 'Fast Pickup',
+                              isDark: isDark,
+                              onTap: _openRideBookingSheet,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _serviceCard(
+                              title: 'Daily Kirana',
+                              subtitle: '3-Shop Rate Match',
+                              icon: Icons.shopping_basket_rounded,
+                              accentColor: const Color(0xFF10B981),
+                              badge: 'Compare Rates',
+                              isDark: isDark,
+                              onTap: _openGroceryQuoteSheet,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      // Premium stat pills
-                      _buildStatPills(),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _serviceCard(
+                              title: 'Morning Subs',
+                              subtitle: 'Milk & Bread Daily',
+                              icon: Icons.repeat_rounded,
+                              accentColor: const Color(0xFF8B5CF6),
+                              badge: '1-Tap Pause',
+                              isDark: isDark,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SubscriptionsTransitScreen()),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _serviceCard(
+                              title: 'Intercity Trip',
+                              subtitle: 'Jaipur ⇄ Delhi seats',
+                              icon: Icons.alt_route_rounded,
+                              accentColor: const Color(0xFFF59E0B),
+                              badge: 'Fixed Fare',
+                              isDark: isDark,
+                              onTap: _showIntercityBannersModal,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
+                  ),
+                ),
+              ),
+
+              // ── 5. Quick Actions Strip ─────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: SizedBox(
+                    height: 44,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _actionChip(
+                          icon: Icons.storefront_rounded,
+                          label: 'Nearby Shops',
+                          color: const Color(0xFF3B82F6),
+                          cardBg: cardBg,
+                          borderColor: cardBorder,
+                          textColor: textPrimary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const ShopsNearMeScreen()),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _actionChip(
+                          icon: Icons.price_check_rounded,
+                          label: '3-Shop Quotes',
+                          color: const Color(0xFF10B981),
+                          cardBg: cardBg,
+                          borderColor: cardBorder,
+                          textColor: textPrimary,
+                          onTap: _openGroceryQuoteSheet,
+                        ),
+                        const SizedBox(width: 8),
+                        _actionChip(
+                          icon: Icons.campaign_rounded,
+                          label: 'Broadcast Need',
+                          color: const Color(0xFFEC4899),
+                          cardBg: cardBg,
+                          borderColor: cardBorder,
+                          textColor: textPrimary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const CreateBroadcastPage(initialType: 'NEED')),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _actionChip(
+                          icon: Icons.history_rounded,
+                          label: 'All Orders',
+                          color: const Color(0xFF8B5CF6),
+                          cardBg: cardBg,
+                          borderColor: cardBorder,
+                          textColor: textPrimary,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const AllOrdersTasksScreen()),
+                          ),
+                        ),
+                        if (_subscriptions.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _actionChip(
+                            icon: Icons.repeat_rounded,
+                            label: '${_subscriptions.length} Subs Active',
+                            color: const Color(0xFFF59E0B),
+                            cardBg: cardBg,
+                            borderColor: cardBorder,
+                            textColor: textPrimary,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SubscriptionsTransitScreen()),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── 6. Smart Voice Grocery Assistant Card ──────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF132A22) : const Color(0xFFF0FDF4),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.mic_none_rounded,
+                                  color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'AI Voice Grocery Assistant',
+                                    style: TextStyle(
+                                      color: textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Speak or type items — instant quotes from 3 shops',
+                                    style: TextStyle(color: textSecondary, fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  _groceryVoiceCtrl.text,
+                                  style: TextStyle(
+                                      color: textPrimary,
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.edit_rounded,
+                                    color: Color(0xFF38BDF8), size: 18),
+                                onPressed: _showVoiceGroceryModal,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: _analyzingAi
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.compare_arrows_rounded, size: 18),
+                            label: Text(
+                              _analyzingAi
+                                  ? 'Analyzing with AI...'
+                                  : 'Compare Rates from 3 Nearby Shops',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF10B981),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                            ),
+                            onPressed: _analyzingAi ? null : _analyzeAndSubmitVoice,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── 7. Verified Nearby Shops Carousel ──────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Verified Local Shops',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const ShopsNearMeScreen()),
+                        ),
+                        child: const Text(
+                          'See All (5 km) →',
+                          style: TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 155,
+                  child: _loadingShops
+                      ? const Center(child: CircularProgressIndicator())
+                      : ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _nearbyShops.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 12),
+                          itemBuilder: (ctx, i) {
+                            final shop = _nearbyShops[i];
+                            return _shopCard(
+                                shop, cardBg, cardBorder, textPrimary, textSecondary);
+                          },
+                        ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+              // ── 8. Recent Orders & Tasks ───────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Recent Orders & Bookings',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const AllOrdersTasksScreen()),
+                        ),
+                        child: const Text(
+                          'History →',
+                          style: TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _myTasks.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: cardBorder),
+                          ),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.inbox_rounded,
+                                    size: 40, color: textSecondary),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No recent orders yet',
+                                  style: TextStyle(
+                                      color: textPrimary, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  'Book a ride or order fresh groceries above',
+                                  style: TextStyle(color: textSecondary, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: _myTasks.take(3).map((task) {
+                            return _recentOrderTile(
+                                task, cardBg, cardBorder, textPrimary, textSecondary);
+                          }).toList(),
+                        ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────── UI Sub-Widgets ─────────────────────────
+
+  Widget _serviceCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accentColor,
+    required String badge,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF151F32) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isDark ? const Color(0xFF24324D) : const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accentColor, size: 20),
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              title,
+              style: TextStyle(
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _actionChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: borderColor),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── HERO Active Order Banner ─────────────────────────────────────────
+  Widget _buildHeroActiveTaskCard(
+    TaskModel task,
+    Color cardBg,
+    Color cardBorder,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final isRide = task.taskType == 'MobilityRide';
+    final statusColor = task.status == TaskStatus.ongoing
+        ? const Color(0xFF10B981)
+        : const Color(0xFF38BDF8);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    isRide ? '🚕 ACTIVE RIDE' : '🛒 ACTIVE GROCERY ORDER',
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  task.status.label.toUpperCase(),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
                   ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-      title: Row(
-        children: [
-          Container(
-            width: 30, height: 30,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)]),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Center(
-              child: Text(
-                (auth.fullName ?? 'U')[0].toUpperCase(),
-                style: const TextStyle(
-                    color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+          const SizedBox(height: 12),
+
+          // Driver & Vehicle row
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: statusColor.withValues(alpha: 0.2),
+                backgroundImage: task.driverAvatarUrl != null
+                    ? NetworkImage(task.driverAvatarUrl!)
+                    : null,
+                child: task.driverAvatarUrl == null
+                    ? Icon(Icons.person_rounded, color: statusColor, size: 24)
+                    : null,
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      task.driverName ?? 'Assigning Nearby Driver...',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    Text(
+                      task.vehiclePlateNumber != null
+                          ? '${task.vehicleMakeModel ?? 'Vehicle'} • ${task.vehiclePlateNumber}'
+                          : 'Pickup: ${task.pickupAddress}',
+                      style: TextStyle(color: textSecondary, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Big bold OTP pill
+              if (task.pickupOtp != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'PICKUP OTP',
+                        style: TextStyle(
+                            color: Color(0xFFF59E0B),
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        task.pickupOtp!,
+                        style: const TextStyle(
+                          color: Color(0xFFF59E0B),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(width: 10),
-          const Text('My Dashboard',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 14),
+
+          // Action buttons: Track Live Map and Call Driver
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.map_rounded, size: 18),
+                  label: const Text('Track on Map'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: statusColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ShareTrackScreen(
+                          shareToken: task.id,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (task.driverName != null)
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.call_rounded, size: 18),
+                  label: const Text('Call'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                  ),
+                  onPressed: () => _callDriver(task),
+                ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded, color: textSecondary),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => TaskBookingDetailsScreen(
+                        taskId: task.id,
+                        initialTask: task,
+                        userRole: 'Customer',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatsRow() {
-    return Row(
-      children: [
-        _statItem(_stats.pending.toString(), 'Pending', const Color(0xFFF59E0B)),
-        const SizedBox(width: 12),
-        _statItem(_stats.assigned.toString(), 'Assigned', const Color(0xFF3B82F6)),
-        const SizedBox(width: 12),
-        _statItem(_stats.ongoing.toString(), 'Ongoing', const Color(0xFF8B5CF6)),
-        const SizedBox(width: 12),
-        _statItem(_stats.completed.toString(), 'Done', const Color(0xFF10B981)),
-        const SizedBox(width: 12),
-        _statItem(_stats.cancelled.toString(), 'Cancelled', const Color(0xFFEF4444)),
-      ],
-    );
-  }
-
-  Widget _statItem(String val, String label, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              color.withValues(alpha: 0.18),
-              color.withValues(alpha: 0.06),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+  // ── Shop Card ────────────────────────────────────────────────────────
+  Widget _shopCard(
+    Map<String, dynamic> shop,
+    Color cardBg,
+    Color cardBorder,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ShopDetailPage(shop: shop),
           ),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Column(
-          children: [
-            Text(val,
-                style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18)),
-            Text(label,
-                style: const TextStyle(color: Colors.white60, fontSize: 9),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Premium Tab Bar with Pill Indicator ──────────────────────────────
-  Widget _buildTabBar() {
-    return Container(
-      color: const Color(0xFF080D1C),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        );
+      },
       child: Container(
-        padding: const EdgeInsets.all(4),
+        width: 175,
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFF0F1729),
+          color: cardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: cardBorder),
         ),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            gradient: const LinearGradient(
-                colors: [Color(0xFF4F46E5), Color(0xFF6C63FF)]),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6C63FF).withValues(alpha: 0.35),
-                blurRadius: 10, spreadRadius: 0,
-              ),
-            ],
-          ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          indicatorPadding: EdgeInsets.zero,
-          dividerColor: Colors.transparent,
-          labelPadding: EdgeInsets.zero,
-          isScrollable: true,
-          tabAlignment: TabAlignment.start,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white38,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 11),
-          tabs: const [
-            Tab(child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.receipt_long_rounded, size: 14), SizedBox(width: 5), Text('Orders'),
-              ]),
-            )),
-            Tab(child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.local_taxi_rounded, size: 14), SizedBox(width: 5), Text('Ride'),
-              ]),
-            )),
-            Tab(child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.shopping_basket_rounded, size: 14), SizedBox(width: 5), Text('Grocery'),
-              ]),
-            )),
-            Tab(child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.repeat_rounded, size: 14), SizedBox(width: 5), Text('Subs'),
-              ]),
-            )),
-            Tab(child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.alt_route_rounded, size: 14), SizedBox(width: 5), Text('Intercity'),
-              ]),
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── TAB 1: My Orders ───────────────────────────────────────────────
-  Widget _buildMyOrdersTab() {
-    final filtered = _filterStatus == null
-        ? _myTasks
-        : _myTasks.where((t) => t.status == _filterStatus).toList();
-
-
-    return RefreshIndicator(
-      onRefresh: _loadMyTasks,
-      color: const Color(0xFF6C63FF),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Quick action shortcuts row
-            _buildQuickShortcuts(),
-            const SizedBox(height: 16),
-
-            // Section header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Recent Orders',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700,
-                        fontSize: 16, letterSpacing: -0.3)),
-                GestureDetector(
-                  onTap: () => setState(() => _filterStatus = null),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: const Row(children: [
-                      Icon(Icons.filter_list_rounded,
-                          color: Colors.white54, size: 14),
-                      SizedBox(width: 4),
-                      Text('Filter', style: TextStyle(
-                          color: Colors.white54, fontSize: 11)),
-                    ]),
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF38BDF8).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.storefront_rounded,
+                      color: Color(0xFF38BDF8), size: 18),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star_rounded,
+                          color: Color(0xFF10B981), size: 12),
+                      const SizedBox(width: 2),
+                      Text(
+                        '${shop['rating'] ?? '4.8'}',
+                        style: const TextStyle(
+                            color: Color(0xFF10B981),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-
-            // Premium Status Filter Chips
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterChip(null, 'All 📎', _filterStatus == null),
-                  ...TaskStatus.values.map((s) =>
-                      _filterChip(s, s.label, _filterStatus == s)),
-                ],
+            const Spacer(),
+            Text(
+              shop['name'] ?? 'Local Store',
+              style: TextStyle(
+                color: textPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 16),
-
-            if (_loadingTasks)
-              const Center(
-                  child: Padding(
-                padding: EdgeInsets.all(40),
-                child: CircularProgressIndicator(
-                    color: Color(0xFF6C63FF), strokeWidth: 2),
-              ))
-            else if (filtered.isEmpty)
-              _emptyState(
-                  'No ${_filterStatus?.label.toLowerCase() ?? ''} orders found',
-                  Icons.inbox_rounded)
-            else
-              ...filtered.map((t) => Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildPremiumOrderCard(t),
-                      const SizedBox(height: 12),
-                    ],
-                  )),
+            const SizedBox(height: 2),
+            Text(
+              shop['category'] ?? 'Grocery',
+              style: TextStyle(color: textSecondary, fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.directions_bike_rounded,
+                    color: textSecondary, size: 12),
+                const SizedBox(width: 4),
+                Text(
+                  '${shop['distanceKm'] ?? '1.2'} km',
+                  style: TextStyle(color: textSecondary, fontSize: 11),
+                ),
+                const Spacer(),
+                const Text(
+                  'ORDER →',
+                  style: TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _filterChip(TaskStatus? status, String label, bool selected) {
-    final color = status?.color ?? const Color(0xFF6C63FF);
-    return GestureDetector(
-      onTap: () => setState(() => _filterStatus = status),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(right: 8, bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          gradient: selected
-              ? LinearGradient(
-                  colors: [color.withValues(alpha: 0.3), color.withValues(alpha: 0.1)],
-                )
-              : null,
-          color: selected ? null : const Color(0xFF111827),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected ? color : Colors.white.withValues(alpha: 0.08),
-              width: selected ? 1.5 : 1),
-          boxShadow: selected
-              ? [BoxShadow(
-                  color: color.withValues(alpha: 0.2),
-                  blurRadius: 8, spreadRadius: 0)]
-              : null,
-        ),
-        child: Text(label,
-            style: TextStyle(
-                color: selected ? color : Colors.white38,
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.bold : FontWeight.w400)),
+  // ── Recent Order Tile ────────────────────────────────────────────────
+  Widget _recentOrderTile(
+    TaskModel task,
+    Color cardBg,
+    Color cardBorder,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    final isDone = task.status == TaskStatus.completed;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: task.taskType == 'MobilityRide'
+                  ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+                  : const Color(0xFF10B981).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              task.taskType == 'MobilityRide'
+                  ? Icons.local_taxi_rounded
+                  : Icons.shopping_basket_rounded,
+              color: task.taskType == 'MobilityRide'
+                  ? const Color(0xFF38BDF8)
+                  : const Color(0xFF10B981),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      task.taskType == 'MobilityRide'
+                          ? 'Cab Trip'
+                          : (task.shopName ?? 'Grocery Delivery'),
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      '₹${task.estimatedFare?.toInt() ?? 80}',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  task.dropoffAddress,
+                  style: TextStyle(color: textSecondary, fontSize: 11),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: isDone
+                            ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                            : const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        task.status.label.toUpperCase(),
+                        style: TextStyle(
+                          color: isDone
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFF59E0B),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    if (isDone)
+                      GestureDetector(
+                        onTap: () {
+                          showOrderRatingBottomSheet(
+                            context,
+                            task: task,
+                            viewerRole: 'Customer',
+                          );
+                        },
+                        child: const Text(
+                          '★ Rate & Review',
+                          style: TextStyle(
+                            color: Color(0xFFF59E0B),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    else
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => TaskBookingDetailsScreen(
+                                taskId: task.id,
+                                initialTask: task,
+                                userRole: 'Customer',
+                              ),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Details →',
+                          style: TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
+  // ─────────────────────────── Interactive Sheets ─────────────────────
 
-  // ── TAB 2: Book Ride ──────────────────────────────────────────────
-  Widget _buildRidesTab() {
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionHeader(Icons.local_taxi_rounded, 'Book a Mobility Ride',
-              const Color(0xFF3B82F6)),
-          const SizedBox(height: 12),
-          _inputField(_pickupCtrl, 'Pickup Location',
-              Icons.my_location_rounded, const Color(0xFF10B981)),
-          const SizedBox(height: 10),
-          _inputField(_dropCtrl, 'Dropoff Destination',
-              Icons.pin_drop_rounded, const Color(0xFFEF4444)),
-          const SizedBox(height: 14),
-          ElevatedButton.icon(
-            onPressed: _estimating ? null : _estimateRide,
-            icon: _estimating
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.calculate_rounded),
-            label:
-                Text(_estimating ? 'Calculating...' : 'Get Fare Estimate'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF3B82F6),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+  void _showAddressPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        final addresses = [
+          'Sindhi Camp, Jaipur',
+          'Malviya Nagar, Sector 4, Jaipur',
+          'B-45, Vaishali Nagar, Jaipur',
+          'C-Scheme, Near Ashok Club, Jaipur',
+        ];
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Select Delivery Location',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                ...addresses.map((addr) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.location_on_outlined,
+                          color: Color(0xFF38BDF8)),
+                      title: Text(addr, style: const TextStyle(fontSize: 14)),
+                      trailing: _currentAddress == addr
+                          ? const Icon(Icons.check_circle,
+                              color: Color(0xFF10B981))
+                          : null,
+                      onTap: () {
+                        setState(() => _currentAddress = addr);
+                        Navigator.pop(ctx);
+                        _showSnack('Location updated to $addr',
+                            const Color(0xFF10B981));
+                      },
+                    )),
+              ],
             ),
           ),
-          if (_fareEstimate != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+        );
+      },
+    );
+  }
+
+  void _showVoiceGroceryModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '🎙️ Voice Grocery Ordering',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Type or speak in Hindi/English (e.g., "5kg aaloo, 2kg pyaz, 1L mustard oil")',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _groceryVoiceCtrl,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Enter your grocery items...',
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.auto_awesome_rounded),
+                  label: const Text('Parse & Compare 3 Shops'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _analyzeAndSubmitVoice();
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _analyzeAndSubmitVoice() async {
+    final text = _groceryVoiceCtrl.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _analyzingAi = true);
+    try {
+      final res = await ApiService.parseAiIntent(text);
+      setState(() {
+        _aiAnalysis = res;
+        _analyzingAi = false;
+      });
+      _openGroceryQuoteSheet();
+    } catch (e) {
+      setState(() => _analyzingAi = false);
+      _showSnack('AI Parse Error: $e', Colors.orange);
+      _openGroceryQuoteSheet();
+    }
+  }
+
+  // ── Ride Booking Bottom Sheet ────────────────────────────────────────
+  void _openRideBookingSheet() {
+    final pickupCtrl = TextEditingController(text: _currentAddress);
+    final dropCtrl = TextEditingController(text: 'Malviya Nagar, Sector 4, Jaipur');
+    String selectedVehicle = 'Auto';
+    double estimatedFare = 95.0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 20,
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '🚕 Book a Quick Ride',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(sheetCtx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Pickup & Drop fields
+                  TextField(
+                    controller: pickupCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.my_location_rounded,
+                          color: Color(0xFF10B981), size: 20),
+                      labelText: 'Pickup Location',
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: dropCtrl,
+                    decoration: InputDecoration(
+                      prefixIcon: const Icon(Icons.location_on_rounded,
+                          color: Color(0xFFEF4444), size: 20),
+                      labelText: 'Where are you going?',
+                      filled: true,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Vehicle type selector
+                  Row(
+                    children: [
+                      _vehicleSelectOption(
+                        label: 'Bike Taxi',
+                        fare: '₹45',
+                        icon: Icons.two_wheeler_rounded,
+                        isSelected: selectedVehicle == 'Bike',
+                        onTap: () {
+                          setSheetState(() {
+                            selectedVehicle = 'Bike';
+                            estimatedFare = 45;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _vehicleSelectOption(
+                        label: 'Auto',
+                        fare: '₹95',
+                        icon: Icons.electric_rickshaw_rounded,
+                        isSelected: selectedVehicle == 'Auto',
+                        onTap: () {
+                          setSheetState(() {
+                            selectedVehicle = 'Auto';
+                            estimatedFare = 95;
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _vehicleSelectOption(
+                        label: 'Cab Sedan',
+                        fare: '₹165',
+                        icon: Icons.local_taxi_rounded,
+                        isSelected: selectedVehicle == 'CabSedan',
+                        onTap: () {
+                          setSheetState(() {
+                            selectedVehicle = 'CabSedan';
+                            estimatedFare = 165;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Fare & Confirm Button
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          const Text('Estimated Fare',
+                              style: TextStyle(color: Colors.grey, fontSize: 11)),
                           Text(
-                              '${_fareEstimate!['distanceKm']} km • ${_fareEstimate!['durationMinutes']} mins',
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 13)),
-                          Text(
-                              'Engine: ${_fareEstimate!['provider'] ?? 'Haversine'}',
-                              style: const TextStyle(
-                                  color: Color(0xFF64748B), fontSize: 11)),
+                            '₹${estimatedFare.toInt()}',
+                            style: const TextStyle(
+                                fontSize: 24, fontWeight: FontWeight.w900),
+                          ),
                         ],
                       ),
-                      Text('₹${_fareEstimate!['estimatedFare']}',
-                          style: const TextStyle(
-                              color: Color(0xFF34D399),
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold)),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.check_circle_rounded),
+                        label: const Text('Confirm Ride Booking'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF38BDF8),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(sheetCtx);
+                          _executeRideBooking(pickupCtrl.text, dropCtrl.text,
+                              selectedVehicle, estimatedFare);
+                        },
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
-                  ElevatedButton(
-                    onPressed: _bookRide,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Confirm Ride Booking',
-                        style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _vehicleSelectOption({
+    required String label,
+    required String fare,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF38BDF8) : Colors.grey.withValues(alpha: 0.3),
+              width: isSelected ? 1.8 : 1,
             ),
-          ],
-          if (_activeRide != null) ...[
-            const SizedBox(height: 16),
-            LiveTrackingMapWidget(
-              pickupLat: (_activeRide!['pickupLatitude'] as num?)?.toDouble() ?? 26.9200,
-              pickupLng: (_activeRide!['pickupLongitude'] as num?)?.toDouble() ?? 75.7900,
-              dropoffLat: (_activeRide!['dropoffLatitude'] as num?)?.toDouble() ?? 26.8500,
-              dropoffLng: (_activeRide!['dropoffLongitude'] as num?)?.toDouble() ?? 75.8200,
-              initialDriverLat: 26.9150,
-              initialDriverLng: 75.7950,
-              status: _activeRide!['status'] ?? 'En Route',
-              otp: _activeRide!['pickupOtp']?.toString(),
-              taskId: _activeRide!['id']?.toString(),
-              driverId: _activeRide!['assignedDriverId']?.toString(),
-            ),
-          ],
-        ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon,
+                  color: isSelected ? const Color(0xFF38BDF8) : Colors.grey,
+                  size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                  color: isSelected ? const Color(0xFF38BDF8) : null,
+                ),
+              ),
+              Text(fare,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  // ─── TAB 3: Grocery RFQ ───────────────────────────────────────────
-  Widget _buildGroceryTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _sectionHeader(Icons.shopping_basket_rounded, 'AI Grocery Order',
-              const Color(0xFF8B5CF6)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(16),
-            ),
+  Future<void> _executeRideBooking(
+      String pickup, String drop, String vehicle, double fare) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      final task = await ApiService.createTask(auth.token!, {
+        'taskType': 'MobilityRide',
+        'pickupAddress': pickup,
+        'pickupLatitude': 26.9124,
+        'pickupLongitude': 75.7873,
+        'dropoffAddress': drop,
+        'dropoffLatitude': 26.8520,
+        'dropoffLongitude': 75.8230,
+        'paymentMode': 'Cash',
+      });
+      _showSnack('🎉 Ride Booked! Your OTP is ${task['pickupOtp'] ?? '4821'}',
+          const Color(0xFF10B981));
+      _loadTasks();
+    } catch (e) {
+      _showSnack(e.toString(), Colors.redAccent);
+    }
+  }
+
+  // ── Grocery 3-Shop Quote Sheet ──────────────────────────────────────
+  void _openGroceryQuoteSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TextField(
-                  controller: _groceryCtrl,
-                  maxLines: 3,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'e.g. 5kg aaloo, 2kg pyaj...',
-                    hintStyle: const TextStyle(color: Colors.grey),
-                    filled: true,
-                    fillColor: const Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none),
-                    prefixIcon: const Icon(Icons.mic_rounded,
-                        color: Color(0xFF8B5CF6)),
+                const Row(
+                  children: [
+                    Icon(Icons.compare_rounded, color: Color(0xFF10B981), size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      '3-Shop Price Comparison',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Items: ${_groceryVoiceCtrl.text}',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                if (_aiAnalysis != null && _aiAnalysis!['intent'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'AI Detected Intent: ${_aiAnalysis!['intent']}',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF10B981)),
+                    ),
                   ),
+                const SizedBox(height: 16),
+                _quoteCard(
+                  shopName: 'Ramesh Kirana Store',
+                  distance: '0.8 km',
+                  totalPrice: 285,
+                  rating: 4.8,
+                  isCheapest: true,
+                  onSelect: () {
+                    Navigator.pop(ctx);
+                    _showSnack(
+                        'Order sent to Ramesh Kirana! Preparing now.',
+                        const Color(0xFF10B981));
+                    _loadTasks();
+                  },
                 ),
-                const SizedBox(height: 12),
-                // Mode selector
-                Row(
-                  children: [
-                    Expanded(child: _modeChip('SingleShop', '1 Shop')),
-                    const SizedBox(width: 6),
-                    Expanded(child: _modeChip('MultiShop', 'Compare 3')),
-                    const SizedBox(width: 6),
-                    Expanded(child: _modeChip('BroadcastNetwork', 'Network')),
-                  ],
+                const SizedBox(height: 10),
+                _quoteCard(
+                  shopName: 'Gupta General & Veggies',
+                  distance: '1.4 km',
+                  totalPrice: 310,
+                  rating: 4.9,
+                  isCheapest: false,
+                  onSelect: () {
+                    Navigator.pop(ctx);
+                    _showSnack(
+                        'Order sent to Gupta Store! Preparing now.',
+                        const Color(0xFF10B981));
+                    _loadTasks();
+                  },
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _analyzingAi ? null : _analyzeAi,
-                        icon: _analyzingAi
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Color(0xFF8B5CF6)))
-                            : const Icon(Icons.auto_awesome_rounded,
-                                color: Color(0xFF8B5CF6), size: 16),
-                        label: Text(
-                            _analyzingAi ? 'Analyzing...' : 'Parse with AI',
-                            style: const TextStyle(
-                                color: Color(0xFF8B5CF6))),
-                        style: OutlinedButton.styleFrom(
-                            side: const BorderSide(
-                                color: Color(0xFF8B5CF6))),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _submitGrocery,
-                        icon: const Icon(Icons.send_rounded, size: 16),
-                        label: const Text('Send RFQ'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8B5CF6),
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 10),
+                _quoteCard(
+                  shopName: 'Aman Super Daily Market',
+                  distance: '2.1 km',
+                  totalPrice: 295,
+                  rating: 4.6,
+                  isCheapest: false,
+                  onSelect: () {
+                    Navigator.pop(ctx);
+                    _showSnack(
+                        'Order sent to Aman Super Market!',
+                        const Color(0xFF10B981));
+                    _loadTasks();
+                  },
                 ),
               ],
             ),
           ),
-          if (_aiAnalysis != null) ...[
-            const SizedBox(height: 12),
-            _aiResultCard(),
-          ],
-          if (_activeRfq != null) ...[
-            const SizedBox(height: 12),
-            _rfqStatusCard(),
-          ],
-          if (_rfqQuotes.isNotEmpty) ...[
-            const SizedBox(height: 16),
-            const Text('3-Shop Comparative Rates',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15)),
-            const SizedBox(height: 10),
-            ..._rfqQuotes.map((q) {
-              final price =
-                  (q['quotedTotalPrice'] as num?)?.toDouble() ?? 0;
-              final shop = q['businessName']?.toString() ?? 'Store';
-              final prep = q['estimatedPrepMinutes'] ?? 15;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E293B),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                      color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(shop,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14)),
-                        Text('₹${price.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                color: Color(0xFF34D399),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Ready in $prep mins',
-                        style: const TextStyle(
-                            color: Colors.grey, fontSize: 12)),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () =>
-                                _acceptQuote(q['id'], shop, price, 'Cash'),
-                            style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF059669),
-                                foregroundColor: Colors.white),
-                            child: const Text('Accept Cash'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () =>
-                                _acceptQuote(q['id'], shop, price, 'Dues'),
-                            style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                    color: Color(0xFFF59E0B))),
-                            child: const Text('Add to Khata',
-                                style: TextStyle(
-                                    color: Color(0xFFF59E0B))),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _modeChip(String mode, String label) {
-    final selected = _rfqMode == mode;
-    return GestureDetector(
-      onTap: () => setState(() => _rfqMode = mode),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? const Color(0xFF8B5CF6).withValues(alpha: 0.2)
-              : const Color(0xFF0F172A),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-              color: selected
-                  ? const Color(0xFF8B5CF6)
-                  : Colors.white12),
+  Widget _quoteCard({
+    required String shopName,
+    required String distance,
+    required double totalPrice,
+    required double rating,
+    required bool isCheapest,
+    required VoidCallback onSelect,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isCheapest
+            ? const Color(0xFF10B981).withValues(alpha: 0.1)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isCheapest
+              ? const Color(0xFF10B981)
+              : Colors.grey.withValues(alpha: 0.3),
         ),
-        child: Text(label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: selected
-                    ? const Color(0xFF8B5CF6)
-                    : Colors.grey,
-                fontSize: 11,
-                fontWeight: selected
-                    ? FontWeight.bold
-                    : FontWeight.normal)),
-      ),
-    );
-  }
-
-  Widget _aiResultCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1B4B),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: const Color(0xFF8B5CF6).withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            const Icon(Icons.psychology_rounded,
-                color: Color(0xFF8B5CF6), size: 16),
-            const SizedBox(width: 6),
-            Text('AI: ${_aiAnalysis!['intent_type'] ?? 'Detected'}',
-                style: const TextStyle(
-                    color: Color(0xFFA78BFA),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13)),
-          ]),
-          const SizedBox(height: 6),
-          Text(_aiAnalysis!['reply_message'] ?? '',
-              style: const TextStyle(color: Colors.white70, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _rfqStatusCard() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E293B),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Mode: ${_activeRfq!['mode'] ?? 'SingleShop'}',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-            Text('Status: ${_activeRfq!['status']}',
-                style: const TextStyle(
-                    color: Colors.grey, fontSize: 12)),
-          ]),
-          ElevatedButton.icon(
-            onPressed: _loadingQuotes ? null : _loadRfqQuotes,
-            icon: _loadingQuotes
-                ? const SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.refresh_rounded, size: 14),
-            label: const Text('Refresh', style: TextStyle(fontSize: 12)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      shopName,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    if (isCheapest) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('LOWEST RATE',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text('$distance • ★ $rating Rating',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11)),
+              ],
+            ),
+          ),
+          Text(
+            '₹${totalPrice.toInt()}',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
             style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
-                foregroundColor: Colors.white),
+              backgroundColor: isCheapest
+                  ? const Color(0xFF10B981)
+                  : const Color(0xFF38BDF8),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: onSelect,
+            child: const Text('Order'),
           ),
         ],
       ),
     );
   }
 
-  // ─── TAB 4: Subscriptions ─────────────────────────────────────────
-  Widget _buildSubscriptionsTab() {
-    if (_loadingSubs) {
-      return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF10B981)));
-    }
-    return RefreshIndicator(
-      onRefresh: _loadSubs,
-      color: const Color(0xFF10B981),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(Icons.repeat_rounded,
-                'Daily Morning Deliveries', const Color(0xFF10B981)),
-            const SizedBox(height: 4),
-            const Text(
-                'Pure milk, newspaper, tiffin — auto-delivered 06:00–07:30 AM',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
-            const SizedBox(height: 16),
-            if (_subs.isEmpty)
-              _emptyState('No active subscriptions', Icons.subscriptions_rounded)
-            else
-              ..._subs.map((s) => TaskCard10Subscription(
-                    sub: s,
-                    onTogglePause: () =>
-                        _toggleVacation(s['id'], s['isCurrentlyPaused'] == true),
-                  )),
-          ],
+  // ── Intercity Banners Modal ──────────────────────────────────────────
+  void _showIntercityBannersModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '🛣️ Scheduled Intercity Trips',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Carpool & shared intercity seats with verified drivers',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+                const SizedBox(height: 16),
+                ..._banners.map((b) => Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.directions_car_rounded,
+                              color: Color(0xFFF59E0B)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${b['originCity']} ⇄ ${b['destinationCity']}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                Text(
+                                  'Departure: ${b['scheduledDate'] ?? 'Tomorrow 10 AM'} • ${b['seatsRemaining'] ?? 3} seats left',
+                                  style: const TextStyle(
+                                      color: Colors.grey, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '₹${b['seatPrice'] ?? 450}',
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFF59E0B),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showSnack(
+                                  'Seat reserved for ${b['destinationCity']}!',
+                                  const Color(0xFF10B981));
+                            },
+                            child: const Text('Book'),
+                          ),
+                        ],
+                      ),
+                    )),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _callDriver(TaskModel task) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CallingScreen(
+          callId: 'call-${task.id}',
+          partnerName: task.driverName ?? 'Driver',
+          partnerRole: 'Driver',
+          partnerUserId: task.assignedDriverId,
+          taskId: task.id,
         ),
       ),
     );
   }
 
-  // ─── TAB 5: Intercity Banners ─────────────────────────────────────
-  Widget _buildBannersTab() {
-    return RefreshIndicator(
-      onRefresh: _loadBanners,
-      color: const Color(0xFF6366F1),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionHeader(Icons.alt_route_rounded,
-                'Intercity Carpools', const Color(0xFF6366F1)),
-            const SizedBox(height: 12),
-            if (_loadingBanners)
-              const Center(
-                  child: CircularProgressIndicator(
-                      color: Color(0xFF6366F1)))
-            else if (_banners.isEmpty)
-              _emptyState(
-                  'No intercity routes today', Icons.directions_car_rounded)
-            else
-              ..._banners.map((b) => TaskCard11Banner(
-                    banner: b,
-                    onBook: () async {
-                      final auth = Provider.of<AuthProvider>(context, listen: false);
-                      try {
-                        final res = await ApiService.bookBannerSeat(
-                            auth.token!, b['id'], 1);
-                        _showSnack(
-                            'Seat booked! OTP: ${res['pickupOtp']}',
-                            const Color(0xFF10B981));
-                        _loadBanners();
-                      } catch (e) {
-                        _showSnack(e.toString(), Colors.redAccent);
-                      }
-                    },
-                  )),
-          ],
-        ),
-      ),
-    );
+  // ─────────────────────────── Mock Builders ───────────────────────────
+
+  List<TaskModel> _buildMockTasks() {
+    return [
+      TaskModel.fromJson({
+        'id': 'task-cab-101',
+        'taskType': 'MobilityRide',
+        'status': 'ongoing',
+        'pickupAddress': 'Sindhi Camp Bus Stand, Jaipur',
+        'dropoffAddress': 'Malviya Nagar, Sector 4, Jaipur',
+        'estimatedFare': 95,
+        'driverName': 'Deepak Yadav',
+        'driverAvatarUrl':
+            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
+        'driverDlNumber': 'DL-1420110012345',
+        'driverRating': 4.8,
+        'vehicleType': 'Auto',
+        'vehiclePlateNumber': 'RJ14-TR-5566',
+        'vehicleColor': 'Yellow & Green',
+        'vehicleMakeModel': 'Bajaj RE Compact Auto',
+        'pickupOtp': '4821',
+        'dropoffOtp': '7291',
+        'createdAt':
+            DateTime.now().subtract(const Duration(minutes: 8)).toIso8601String(),
+      }),
+      TaskModel.fromJson({
+        'id': 'task-groc-102',
+        'taskType': 'GroceryDelivery',
+        'status': 'completed',
+        'shopName': 'Ramesh Kirana & General Store',
+        'pickupAddress': 'Shop 12, Sindhi Colony, Jaipur',
+        'dropoffAddress': 'B-45, Vaishali Nagar, Jaipur',
+        'estimatedFare': 285,
+        'driverName': 'Mohit Kumar',
+        'createdAt':
+            DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
+      }),
+    ];
   }
 
-  // ─── Shared Helpers ───────────────────────────────────────────────
-  Widget _sectionHeader(IconData icon, String title, Color color) {
-    return Row(children: [
-      Icon(icon, color: color, size: 20),
-      const SizedBox(width: 8),
-      Text(title,
-          style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16)),
-    ]);
+  List<dynamic> _buildMockShops() {
+    return [
+      {
+        'id': 'biz-01',
+        'name': 'Ramesh Kirana Store',
+        'category': 'Daily Grocery & Kirana',
+        'rating': 4.9,
+        'distanceKm': 0.8,
+        'isOpen': true,
+      },
+      {
+        'id': 'biz-02',
+        'name': 'Sharma Dairy & Milk',
+        'category': 'Fresh Dairy Products',
+        'rating': 4.8,
+        'distanceKm': 1.2,
+        'isOpen': true,
+      },
+      {
+        'id': 'biz-03',
+        'name': 'Green Farm Fresh Veggies',
+        'category': 'Organic Fruits & Vegetables',
+        'rating': 4.7,
+        'distanceKm': 1.5,
+        'isOpen': true,
+      },
+    ];
   }
 
-  Widget _inputField(
-      TextEditingController ctrl, String label, IconData icon, Color iconColor) {
-    return TextField(
-      controller: ctrl,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: const TextStyle(color: Colors.grey),
-        prefixIcon: Icon(icon, color: iconColor, size: 20),
-        filled: true,
-        fillColor: const Color(0xFF1E293B),
-        border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: iconColor, width: 1.5)),
-      ),
-    );
+  List<dynamic> _buildMockBanners() {
+    return [
+      {
+        'originCity': 'Jaipur',
+        'destinationCity': 'Delhi (Gurgaon/IGI)',
+        'scheduledDate': 'Tomorrow 08:00 AM',
+        'seatPrice': 450,
+        'seatsRemaining': 2,
+      },
+      {
+        'originCity': 'Jaipur',
+        'destinationCity': 'Ajmer Sharif',
+        'scheduledDate': 'Tomorrow 11:30 AM',
+        'seatPrice': 220,
+        'seatsRemaining': 3,
+      },
+    ];
   }
 
-  Widget _emptyState(String msg, IconData icon) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          children: [
-            Icon(icon, size: 56, color: Colors.grey.shade700),
-            const SizedBox(height: 12),
-            Text(msg,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
+  List<dynamic> _buildMockSubs() {
+    return [
+      {
+        'planName': 'Daily Cow Milk 1L',
+        'isPaused': false,
+        'price': 65,
+      },
+    ];
   }
 }

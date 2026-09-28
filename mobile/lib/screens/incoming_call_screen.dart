@@ -233,11 +233,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
         width: screenSize.width,
         height: screenSize.height,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0A0E1A),
+          color: const Color(0xFF0F172A),
               Color(0xFF0F1B30),
               Color(0xFF071523),
             ],
@@ -305,11 +301,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                               height: 140,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    Color(0xFF00C853),
+                                color: const Color(0xFF10B981),
                                     Color(0xFF1DE9B6),
                                     Color(0xFF00BFA5),
                                   ],
@@ -451,10 +443,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                                 width: 80,
                                 height: 80,
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [Color(0xFF00C853), Color(0xFF1DE9B6)],
+                                  color: const Color(0xFF10B981), Color(0xFF1DE9B6)],
                                   ),
                                   shape: BoxShape.circle,
                                   boxShadow: [

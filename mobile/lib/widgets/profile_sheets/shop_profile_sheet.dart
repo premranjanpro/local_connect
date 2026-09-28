@@ -84,8 +84,7 @@ class _ShopProfileSheetState extends State<_ShopProfileSheet> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)],
+                    color: const Color(0xFF1E293B), Color(0xFF1E293B)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),

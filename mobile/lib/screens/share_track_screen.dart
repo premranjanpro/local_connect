@@ -240,26 +240,31 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
   }
 
   Widget _buildLoadingScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final text = isDark ? Colors.white : const Color(0xFF0F172A);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: bg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(
-              width: 64,
-              height: 64,
+              width: 50,
+              height: 50,
               child: CircularProgressIndicator(
-                color: Color(0xFF6C63FF),
+                color: Color(0xFF2563EB),
                 strokeWidth: 3,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
-              'Resolving tracking link...',
+              'Connecting to live GPS...',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
+                color: text,
                 fontSize: 16,
+                fontWeight: FontWeight.w600,
                 fontFamily: 'Inter',
               ),
             ),
@@ -270,8 +275,12 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
   }
 
   Widget _buildErrorScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final text = isDark ? Colors.white : const Color(0xFF0F172A);
+
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: bg,
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -279,43 +288,44 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 80,
-                height: 80,
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.15),
+                  color: const Color(0xFFEF4444).withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.link_off_rounded, color: Colors.redAccent, size: 40),
+                child: const Icon(Icons.link_off_rounded, color: Color(0xFFEF4444), size: 36),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                'Tracking Link Invalid',
+              const SizedBox(height: 20),
+              Text(
+                'Tracking Link Expired or Invalid',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
+                  color: text,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                   fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Text(
-                _errorMsg,
+                _errorMsg.isNotEmpty ? _errorMsg : 'This task has concluded or the tracking link is inactive.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   fontSize: 14,
                   fontFamily: 'Inter',
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               ElevatedButton.icon(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('Go Back'),
+                icon: const Icon(Icons.arrow_back, color: Colors.white, size: 18),
+                label: const Text('Back to Home', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6C63FF),
+                  backgroundColor: const Color(0xFF2563EB),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
               ),
             ],
@@ -326,11 +336,16 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
   }
 
   Widget _buildTrackingScreen() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? Colors.white : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
     final animLat = _latAnim.value;
     final animLng = _lngAnim.value;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
       body: Stack(
         children: [
           // ── Full-Screen Live Map ──────────────────────────────────────────
@@ -345,38 +360,36 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             ),
             children: [
               TileLayer(
-                urlTemplate:
-                    'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.shopconnector.app',
               ),
 
-              // Animated driver marker
+              // Animated driver marker (Clean flat circular navigation pin)
               MarkerLayer(
                 markers: [
                   Marker(
                     point: LatLng(animLat, animLng),
-                    width: 56,
-                    height: 56,
+                    width: 52,
+                    height: 52,
                     child: Transform.rotate(
                       angle: _bearingAnim.value * (math.pi / 180),
                       child: ScaleTransition(
                         scale: _pulseAnim,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
-                            ),
+                            color: const Color(0xFF2563EB),
                             shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2.5),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF6C63FF).withOpacity(0.5),
-                                blurRadius: 16,
-                                spreadRadius: 4,
+                                color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                                blurRadius: 14,
+                                spreadRadius: 3,
                               ),
                             ],
                           ),
                           child: const Icon(Icons.navigation_rounded,
-                              color: Colors.white, size: 28),
+                              color: Colors.white, size: 26),
                         ),
                       ),
                     ),
@@ -386,28 +399,7 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             ],
           ),
 
-          // ── Gradient overlay at bottom ────────────────────────────────────
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              height: 280,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    const Color(0xFF0A0E1A).withOpacity(0.7),
-                    const Color(0xFF0A0E1A),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // ── Top Header ────────────────────────────────────────────────────
+          // ── Top Header Pill ───────────────────────────────────────────────
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
@@ -417,52 +409,88 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1E2E).withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(12),
+                      color: cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                    child: const Icon(Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white, size: 18),
+                    child: Icon(Icons.arrow_back_ios_new_rounded,
+                        color: textPrimary, size: 18),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1A1E2E).withOpacity(0.9),
+                      color: cardBg,
                       borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.06),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 8,
-                          height: 8,
+                          width: 10,
+                          height: 10,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF00E676),
+                            color: Color(0xFF10B981),
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Live Tracking',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            fontFamily: 'Inter',
-                          ),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Live GPS Tracking',
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                            Text(
+                              'Driver is in transit',
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                         const Spacer(),
-                        Text(
-                          _etaText,
-                          style: const TextStyle(
-                            color: Color(0xFF6C63FF),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            fontFamily: 'Inter',
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _etaText,
+                            style: const TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontFamily: 'Inter',
+                            ),
                           ),
                         ),
                       ],
@@ -473,78 +501,56 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             ),
           ),
 
-          // ── Bottom Info Card ──────────────────────────────────────────────
+          // ── Bottom Floating Card ──────────────────────────────────────────
           Positioned(
             left: 16,
             right: 16,
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-            child: _buildInfoCard(),
+            bottom: MediaQuery.of(context).padding.bottom + 16,
+            child: _buildInfoCard(isDark, cardBg, cardBorder, textPrimary, textSecondary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoCard() {
-    return GestureDetector(
-      onTap: () {
-        final trackTask = TaskModel(
-          id: _taskId ?? 'share-track',
-          taskType: 'MobilityRide',
-          status: taskStatusFromString(_taskStatus),
-          pickupAddress: _pickupAddress ?? '',
-          dropoffAddress: _dropoffAddress ?? '',
-          driverName: _driverName,
-          driverAvatarUrl: _driverAvatarUrl,
-          driverDlNumber: _driverDlNumber,
-          driverRating: _driverRating ?? 4.9,
-          vehiclePlateNumber: _driverVehicle,
-          vehicleColor: _vehicleColor,
-          vehiclePhotoUrl: _vehiclePhoto,
-          vehicleMakeModel: _vehicleMakeModel,
-          vehicleType: _vehicleType,
-          createdAt: DateTime.now(),
-        );
-        showDriverVehicleBottomSheet(context, task: trackTask);
-      },
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1E2E),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: const Color(0xFF6C63FF).withOpacity(0.3),
-            width: 1,
+  Widget _buildInfoCard(
+    bool isDark,
+    Color cardBg,
+    Color cardBorder,
+    Color textPrimary,
+    Color textSecondary,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.4),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Driver info
-            Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Driver info header
+          Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
+                  color: const Color(0xFF2563EB),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Center(
                   child: Text(
-                    _driverName?.substring(0, 1).toUpperCase() ?? 'D',
+                    _driverName?.isNotEmpty == true ? _driverName![0].toUpperCase() : 'D',
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -554,38 +560,53 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
                   ),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _driverName ?? 'Driver',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      _driverName ?? 'Delivery Partner',
+                      style: TextStyle(
+                        color: textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                         fontFamily: 'Inter',
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    if (_driverVehicle != null && _driverVehicle!.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6C63FF).withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          _driverVehicle!,
-                          style: const TextStyle(
-                            color: Color(0xFF6C63FF),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        if (_driverVehicle != null && _driverVehicle!.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _driverVehicle!,
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 15),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${_driverRating ?? 4.9}',
+                          style: TextStyle(
+                            color: textSecondary,
                             fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -593,28 +614,20 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00E676).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF00E676),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    const Text(
-                      'On the way',
+                    Icon(Icons.directions_bike_rounded, color: Color(0xFF10B981), size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      'En Route',
                       style: TextStyle(
-                        color: Color(0xFF00E676),
+                        color: Color(0xFF10B981),
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
@@ -623,105 +636,94 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             ],
           ),
 
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C63FF).withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3)),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.badge_rounded, color: Color(0xFF93C5FD), size: 14),
-                SizedBox(width: 6),
-                Text(
-                  'Tap to view Driver Photo, DL & Vehicle Details',
-                  style: TextStyle(
-                    color: Color(0xFF93C5FD),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded, color: Color(0xFF93C5FD), size: 14),
-              ],
-            ),
-          ),
-
           const SizedBox(height: 14),
-          const Divider(color: Color(0xFF2A2E3E), height: 1),
+          Divider(color: cardBorder, height: 1),
           const SizedBox(height: 14),
 
           // Route info
           _buildAddressRow(
-            icon: Icons.radio_button_checked,
-            color: const Color(0xFF6C63FF),
+            icon: Icons.storefront_rounded,
+            color: const Color(0xFF2563EB),
             label: 'Pickup',
-            address: _pickupAddress ?? 'Loading...',
+            address: _pickupAddress ?? 'Store Address',
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
           ),
           const SizedBox(height: 10),
           _buildAddressRow(
             icon: Icons.location_on_rounded,
-            color: const Color(0xFFFF6B6B),
-            label: 'Drop',
-            address: _dropoffAddress ?? 'Loading...',
+            color: const Color(0xFFEF4444),
+            label: 'Delivery Address',
+            address: _dropoffAddress ?? 'Customer Address',
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
           ),
 
           const SizedBox(height: 16),
 
-          // Share + Copy buttons
+          // Quick Action buttons
           Row(
             children: [
               Expanded(
-                child: _actionButton(
-                  icon: Icons.share_rounded,
-                  label: 'Share Link',
-                  color: const Color(0xFF6C63FF),
-                  onTap: _shareLink,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.share_rounded, size: 16),
+                  label: const Text('Share Live Link', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  onPressed: _shareLink,
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(
-                child: _actionButton(
-                  icon: Icons.copy_rounded,
-                  label: 'Copy Link',
-                  color: const Color(0xFF3ECFCF),
-                  onTap: _copyLink,
-                ),
-              ),
-            ],
-          ),
-
-          // Privacy notice
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.lock_outline_rounded,
-                  size: 12, color: Colors.white.withOpacity(0.35)),
-              const SizedBox(width: 5),
-              Text(
-                "Driver's phone number is protected. Share safely.",
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
-                  fontSize: 10,
-                  fontFamily: 'Inter',
+              GestureDetector(
+                onTap: () {
+                  final trackTask = TaskModel(
+                    id: _taskId ?? 'share-track',
+                    taskType: 'MobilityRide',
+                    status: taskStatusFromString(_taskStatus),
+                    pickupAddress: _pickupAddress ?? '',
+                    dropoffAddress: _dropoffAddress ?? '',
+                    driverName: _driverName,
+                    driverAvatarUrl: _driverAvatarUrl,
+                    driverDlNumber: _driverDlNumber,
+                    driverRating: _driverRating ?? 4.9,
+                    vehiclePlateNumber: _driverVehicle,
+                    vehicleColor: _vehicleColor,
+                    vehiclePhotoUrl: _vehiclePhoto,
+                    vehicleMakeModel: _vehicleMakeModel,
+                    vehicleType: _vehicleType,
+                    createdAt: DateTime.now(),
+                  );
+                  showDriverVehicleBottomSheet(context, task: trackTask);
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: cardBorder),
+                  ),
+                  child: Icon(Icons.badge_rounded, color: textPrimary, size: 20),
                 ),
               ),
             ],
           ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildAddressRow({
     required IconData icon,
     required Color color,
     required String label,
     required String address,
+    required Color textPrimary,
+    required Color textSecondary,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -733,21 +735,23 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                label,
+                label.toUpperCase(),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
+                  color: textSecondary,
                   fontSize: 10,
                   fontFamily: 'Inter',
-                  fontWeight: FontWeight.w500,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),
               ),
+              const SizedBox(height: 2),
               Text(
                 address,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: textPrimary,
                   fontSize: 13,
                   fontFamily: 'Inter',
+                  fontWeight: FontWeight.w500,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -756,41 +760,6 @@ class _ShareTrackScreenState extends State<ShareTrackScreen>
           ),
         ),
       ],
-    );
-  }
-
-  Widget _actionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 

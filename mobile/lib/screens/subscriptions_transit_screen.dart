@@ -818,8 +818,7 @@ class _SubscriptionsTransitScreenState extends State<SubscriptionsTransitScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF064E3B), Color(0xFF1E293B)],
+              color: const Color(0xFF1E293B), Color(0xFF1E293B)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1108,8 +1107,7 @@ class _SubscriptionsTransitScreenState extends State<SubscriptionsTransitScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF78350F), Color(0xFF1E293B)],
+              color: const Color(0xFF1E293B), Color(0xFF1E293B)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

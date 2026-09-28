@@ -14,6 +14,7 @@ import '../widgets/profile_sheets/shop_profile_sheet.dart';
 import '../widgets/profile_sheets/customer_profile_sheet.dart';
 import '../widgets/profile_sheets/driver_profile_sheet.dart';
 import 'calling_screen.dart';
+import 'share_track_screen.dart';
 
 /// ══════════════════════════════════════════════════════════════════════════════
 ///  Task / Booking Details Screen
@@ -202,12 +203,15 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
   // ══════════════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final role = widget.userRole.toLowerCase();
+
     return Scaffold(
-      backgroundColor: const Color(0xFF050A15),
+      backgroundColor: bg,
       appBar: _buildAppBar(),
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 350),
+        duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, anim) =>
             FadeTransition(opacity: anim, child: child),
         child: _buildRoleStatusView(role),
@@ -216,7 +220,13 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final statusColor = _currentStatus.color;
+
     final shortId = widget.taskId.length > 8
         ? widget.taskId.substring(0, 8).toUpperCase()
         : widget.taskId.toUpperCase();
@@ -227,52 +237,39 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
             : '👤';
 
     return AppBar(
-      backgroundColor: const Color(0xFF050A15),
+      backgroundColor: cardBg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
-      flexibleSpace: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              statusColor.withValues(alpha: 0.12),
-              const Color(0xFF050A15),
-            ],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          border: Border(
-            bottom: BorderSide(
-                color: statusColor.withValues(alpha: 0.2), width: 0.8),
-          ),
-        ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: cardBorder, height: 1),
       ),
       leading: GestureDetector(
         onTap: () => Navigator.pop(context),
         child: Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+            border: Border.all(color: cardBorder),
           ),
-          child: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 16),
+          child: Icon(Icons.arrow_back_ios_new_rounded,
+              color: textPrimary, size: 16),
         ),
       ),
       title: Row(
         children: [
-          // Role emoji badge
           Container(
-            width: 32, height: 32,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                  colors: [statusColor.withValues(alpha: 0.3),
-                    statusColor.withValues(alpha: 0.1)]),
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+              border: Border.all(color: cardBorder),
             ),
-            child: Center(child: Text(roleEmoji,
-                style: const TextStyle(fontSize: 14))),
+            child: Center(
+              child: Text(roleEmoji, style: const TextStyle(fontSize: 14)),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -283,53 +280,39 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
                   children: [
                     Flexible(
                       child: Text(
-                        '${widget.userRole} View',
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w700,
-                            fontSize: 15),
+                        'Order Details',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Animated status pill
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                            color: statusColor.withValues(alpha: 0.4)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: statusColor.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                          ),
-                        ],
+                        color: statusColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(_currentStatus.icon,
-                              color: statusColor, size: 10),
-                          const SizedBox(width: 4),
-                          Text(
-                            _currentStatus.label,
-                            style: TextStyle(
-                                color: statusColor,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 10),
-                          ),
-                        ],
+                      child: Text(
+                        _currentStatus.label,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 10,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 Text(
-                  'Order #$shortId',
-                  style: const TextStyle(
-                      color: Colors.white38, fontSize: 10,
-                      letterSpacing: 0.5),
+                  '#$shortId • ${widget.userRole}',
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 11,
+                  ),
                 ),
               ],
             ),
@@ -346,13 +329,11 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
             margin: const EdgeInsets.only(right: 12),
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.06),
+              color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1)),
+              border: Border.all(color: cardBorder),
             ),
-            child: const Icon(Icons.refresh_rounded,
-                color: Colors.white70, size: 18),
+            child: Icon(Icons.refresh_rounded, color: textPrimary, size: 18),
           ),
         ),
       ],
@@ -387,19 +368,8 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           return _buildMerchantCancelledView();
       }
     } else {
-      // Default: Customer
-      switch (_currentStatus) {
-        case TaskStatus.pending:
-          return _buildCustomerPendingView();
-        case TaskStatus.assign:
-          return _buildCustomerAssignedView();
-        case TaskStatus.ongoing:
-          return _buildCustomerOngoingView();
-        case TaskStatus.completed:
-          return _buildCustomerCompletedView();
-        case TaskStatus.cancelled:
-          return _buildCustomerCancelledView();
-      }
+      // Default: Customer (Universal Clean Flat Order & Booking View)
+      return _buildCustomerMasterView();
     }
   }
 
@@ -407,121 +377,149 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
   //  1. CUSTOMER - 5 DESIGNS
   // ══════════════════════════════════════════════════════════════════════════════
 
-  /// Customer #1: PENDING
-  Widget _buildCustomerPendingView() {
-    final fare = _task['fareAmount'] ?? _task['estimatedFare'] ?? 150;
-    final pickup = _task['pickupAddress'] ?? 'Nearby Store';
-    final drop = _task['dropoffAddress'] ?? 'Your Location';
+  // ══════════════════════════════════════════════════════════════════════════════
+  //  1. CUSTOMER - MASTER UNIFIED FLAT VIEW (ZERO GRADIENT, LIGHT THEME READY)
+  // ══════════════════════════════════════════════════════════════════════════════
+
+  Widget _buildCustomerMasterView() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final textPrimary = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A);
+    final textSecondary = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    final fare = _task['fareAmount'] ?? _task['estimatedFare'] ?? 120;
+    final pickup = _task['pickupAddress'] ?? 'Pickup Location';
+    final drop = _task['dropoffAddress'] ?? 'Delivery Destination';
+    final shopName = _task['shopName']?.toString();
+    final driverName = _task['driverName']?.toString();
+    final driverPhone = _task['driverPhone']?.toString();
+    final vehiclePlate = _task['vehiclePlateNumber']?.toString();
+    final vehicleModel = _task['vehicleMakeModel']?.toString() ?? 'Bike / Vehicle';
+    final pickupOtp = _task['pickupOtp']?.toString();
+    final dropoffOtp = (_task['dropoffOtp'] ?? _task['deliveryOtp'])?.toString();
+
+    // Status styling
+    Color statusColor;
+    String statusTitle;
+    String statusSubtitle;
+    IconData statusIcon;
+    int currentStep;
+
+    switch (_currentStatus) {
+      case TaskStatus.pending:
+        statusColor = const Color(0xFFF59E0B);
+        statusTitle = 'Connecting with Nearby Partners';
+        statusSubtitle = 'Broadcasting your order to nearby verified shops and drivers';
+        statusIcon = Icons.radar_rounded;
+        currentStep = 0;
+        break;
+      case TaskStatus.assign:
+        statusColor = const Color(0xFF2563EB);
+        statusTitle = 'Partner Assigned';
+        statusSubtitle = 'Driver is heading to the pickup location';
+        statusIcon = Icons.person_pin_circle_rounded;
+        currentStep = 1;
+        break;
+      case TaskStatus.ongoing:
+        statusColor = const Color(0xFF8B5CF6);
+        statusTitle = 'Order On The Way';
+        statusSubtitle = 'Driver has picked up your items and is driving to your address';
+        statusIcon = Icons.two_wheeler_rounded;
+        currentStep = 2;
+        break;
+      case TaskStatus.completed:
+        statusColor = const Color(0xFF10B981);
+        statusTitle = 'Order Delivered Successfully';
+        statusSubtitle = 'Items delivered safely. Thank you for using ShopConnector!';
+        statusIcon = Icons.check_circle_rounded;
+        currentStep = 3;
+        break;
+      case TaskStatus.cancelled:
+        statusColor = const Color(0xFFEF4444);
+        statusTitle = 'Order Cancelled';
+        statusSubtitle = 'This request was cancelled. No charges were deducted.';
+        statusIcon = Icons.cancel_rounded;
+        currentStep = -1;
+        break;
+    }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Radar Pulse Animation Card
-          ScaleTransition(
-            scale: _pulseAnim,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [const Color(0xFFF59E0B).withValues(alpha: 0.15), const Color(0xFF1E293B)],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.radar_rounded, color: Color(0xFFF59E0B), size: 48),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Searching Nearby Drivers & Stores',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Broadcasting within 5 km radius. Your order is pending acceptance.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white60, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Order Summary Card
-          _buildInfoCard(
-            title: 'Order Overview',
-            icon: Icons.receipt_long_rounded,
-            color: const Color(0xFF3B82F6),
-            children: [
-              _buildKeyValue('Estimated Fare', '₹$fare', valueColor: const Color(0xFF10B981)),
-              _buildKeyValue('Pickup Point', pickup),
-              _buildKeyValue('Delivery Point', drop),
-              _buildKeyValue('Payment Mode', _task['paymentMode'] ?? 'Cash on Delivery'),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // Priority Action: Customer can delete/cancel pending orders
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _confirmDeletePendingOrder,
-              icon: const Icon(Icons.delete_forever_rounded, color: Colors.white),
-              label: const Text('Cancel & Permanently Delete', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEF4444),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Customer #2: ASSIGNED
-  Widget _buildCustomerAssignedView() {
-    final driverName = _task['driverName'] ?? _task['driver']?['fullName'] ?? 'Ramesh Kumar Driver';
-    final driverPhone = _task['driverPhone'] ?? _task['driver']?['phone'] ?? '+919876543210';
-    final vehiclePlate = _task['vehiclePlateNumber'] ?? 'RJ14-AB-1234';
-    final vehicleColor = _task['vehicleColor'] ?? 'Flame Red';
-    final vehicleModel = _task['vehicleMakeModel'] ?? 'Hero Splendor Plus';
-    final driverId = _task['assignedDriverId']?.toString() ?? 'd2daea1b-32dc-4bef-89db-fab0a1de7976';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Banner
+          // ── Status Banner ──
           Container(
+            width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)]),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
+              color: statusColor.withValues(alpha: isDark ? 0.15 : 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.verified_rounded, color: Color(0xFF60A5FA), size: 36),
-                const SizedBox(width: 12),
-                const Expanded(
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(statusIcon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Driver Partner Assigned!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text('Driver is preparing and on way to pickup point.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              statusTitle,
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              _currentStatus.label.toUpperCase(),
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        statusSubtitle,
+                        style: TextStyle(color: textSecondary, fontSize: 12, height: 1.3),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Order ID: #${widget.taskId.length > 8 ? widget.taskId.substring(0, 8).toUpperCase() : widget.taskId.toUpperCase()}',
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -530,192 +528,337 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           ),
           const SizedBox(height: 16),
 
-          // Driver Profile Card (Tap opens Driver Profile Sheet)
-          GestureDetector(
-            onTap: () => showDriverProfileSheet(context, driverId: driverId),
-            child: Container(
-              padding: const EdgeInsets.all(16),
+          // ── Progress Stepper (Except when cancelled) ──
+          if (_currentStatus != TaskStatus.cancelled) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cardBorder),
               ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 12),
+                    child: Text(
+                      'Live Order Status',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  _buildOrderStepper(currentStep, isDark),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Live GPS Tracking Card (Active Orders) ──
+          if (_currentStatus == TaskStatus.assign || _currentStatus == TaskStatus.ongoing) ...[
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ShareTrackScreen(shareToken: widget.taskId),
+                  ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2563EB).withValues(alpha: isDark ? 0.2 : 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFF2563EB).withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF2563EB),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Live GPS Route Tracking',
+                            style: TextStyle(
+                              color: Color(0xFF2563EB),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Watch driver movement on the live map in real-time',
+                            style: TextStyle(color: textSecondary, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Color(0xFF2563EB), size: 22),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Security Verification OTP Box ──
+          if (pickupOtp != null || dropoffOtp != null || _currentStatus == TaskStatus.assign || _currentStatus == TaskStatus.ongoing) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 28,
-                        backgroundImage: NetworkImage(
-                          _task['driverAvatarUrl'] ?? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
+                      const Icon(Icons.shield_rounded, color: Color(0xFF10B981), size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Security Verification Code',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Share this 4-digit OTP with your delivery partner to verify your order.',
+                    style: TextStyle(color: textSecondary, fontSize: 11),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      if (pickupOtp != null || _currentStatus == TaskStatus.assign)
+                        Expanded(
+                          child: _buildFlatOtpTile(
+                            label: 'PICKUP OTP',
+                            code: pickupOtp ?? '4821',
+                            cardBg: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderColor: const Color(0xFF2563EB).withValues(alpha: 0.4),
+                            textColor: const Color(0xFF2563EB),
+                          ),
+                        ),
+                      if ((pickupOtp != null || _currentStatus == TaskStatus.assign) &&
+                          (dropoffOtp != null || _currentStatus == TaskStatus.ongoing))
+                        const SizedBox(width: 12),
+                      if (dropoffOtp != null || _currentStatus == TaskStatus.ongoing)
+                        Expanded(
+                          child: _buildFlatOtpTile(
+                            label: 'DELIVERY OTP',
+                            code: dropoffOtp ?? '7392',
+                            cardBg: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderColor: const Color(0xFF10B981).withValues(alpha: 0.4),
+                            textColor: const Color(0xFF10B981),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // ── Delivery Partner Info Card ──
+          if (driverName != null || _currentStatus == TaskStatus.assign || _currentStatus == TaskStatus.ongoing || _currentStatus == TaskStatus.completed) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Delivery Partner',
+                    style: TextStyle(
+                      color: textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.person_rounded, color: Color(0xFF2563EB), size: 26),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(driverName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            const SizedBox(height: 2),
-                            const Text('⭐⭐⭐⭐⭐ 5.0 (87 Trips)', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 12)),
-                            const SizedBox(height: 4),
-                            Text('$vehiclePlate • $vehicleColor $vehicleModel', style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                            Text(
+                              driverName ?? 'Ramesh Kumar (Assigned Driver)',
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '4.9 (180+ deliveries) • $vehicleModel',
+                                  style: TextStyle(color: textSecondary, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                            if (vehiclePlate != null || _currentStatus != TaskStatus.pending)
+                              Text(
+                                vehiclePlate ?? 'RJ 14 CZ 9021',
+                                style: TextStyle(
+                                  color: textPrimary,
+                                  fontSize: 11,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white38, size: 16),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  const Divider(color: Colors.white12),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () => _callUser(driverPhone, driverName, 'Driver'),
-                        icon: const Icon(Icons.call_rounded, color: Color(0xFF10B981)),
-                        label: const Text('Call Driver', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => showDriverProfileSheet(context, driverId: driverId),
-                        icon: const Icon(Icons.badge_rounded, color: Color(0xFF60A5FA)),
-                        label: const Text('View Profile', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.bold)),
-                      ),
+                      if (driverPhone != null || _currentStatus != TaskStatus.pending)
+                        IconButton(
+                          onPressed: () {
+                            _callUser(
+                              driverPhone ?? '9876543210',
+                              driverName ?? 'Delivery Partner',
+                              'Driver',
+                            );
+                          },
+                          icon: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.call_rounded, color: Color(0xFF10B981), size: 20),
+                          ),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
-          // Route Details
-          _buildInfoCard(
-            title: 'Trip Route',
-            icon: Icons.alt_route_rounded,
-            color: const Color(0xFF8B5CF6),
-            children: [
-              _buildKeyValue('Pickup Address', _task['pickupAddress'] ?? 'Store'),
-              _buildKeyValue('Delivery Address', _task['dropoffAddress'] ?? 'Home'),
-              _buildKeyValue('ETA to Pickup', '~8 mins', valueColor: const Color(0xFF38BDF8)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Customer #3: ONGOING
-  Widget _buildCustomerOngoingView() {
-    final pickupOtp = _task['pickupOtp']?.toString() ?? '582103';
-    final dropOtp = _task['dropoffOtp']?.toString() ?? '924185';
-    final isDropOtpRequired = _task['isDropOtpRequired'] ?? true;
-    final driverName = _task['driverName'] ?? 'Ramesh Kumar Driver';
-
-    return Column(
-      children: [
-        // Live GPS Map View (Top 40%)
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.38,
-          child: FlutterMap(
-            mapController: _mapCtrl,
-            options: MapOptions(
-              initialCenter: _driverPos,
-              initialZoom: 14.5,
+          // ── Route & Locations Card ──
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder),
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.shopconnector.app',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _driverPos,
-                    width: 50,
-                    height: 50,
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF3B82F6),
-                        shape: BoxShape.circle,
-                        boxShadow: [BoxShadow(color: Color(0x663B82F6), blurRadius: 10, spreadRadius: 3)],
-                      ),
-                      child: const Icon(Icons.two_wheeler_rounded, color: Colors.white, size: 28),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-
-        // Live Ongoing Bottom Panel
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // MASTER OTP CARD (Priority #1)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF312E81), Color(0xFF1E293B)]),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF818CF8).withValues(alpha: 0.5), width: 1.5),
-                  ),
-                  child: Column(
-                    children: [
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.lock_rounded, color: Color(0xFFA5B4FC), size: 18),
-                          SizedBox(width: 8),
-                          Text('Delivery Verification Code', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_task['pickupOtp'] != null) ...[
-                            _buildOtpBadge('Pickup OTP', pickupOtp),
-                            const SizedBox(width: 14),
-                          ],
-                          if (isDropOtpRequired)
-                            _buildOtpBadge('Drop OTP', dropOtp),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Share this OTP with driver only when your order is delivered to you.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white60, fontSize: 11),
-                      ),
-                    ],
+                Text(
+                  'Route Details',
+                  style: TextStyle(
+                    color: textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // Driver Action Bar
+                const SizedBox(height: 14),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () => _callUser('+919876543210', driverName, 'Driver'),
-                        icon: const Icon(Icons.phone_in_talk_rounded, color: Colors.white),
-                        label: const Text('Call Driver'),
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF10B981)),
-                      ),
+                    Column(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        Container(
+                          width: 2,
+                          height: 38,
+                          color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                        ),
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 14),
                     Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => AudioToneService.playStatusUpdateTone(),
-                        icon: const Icon(Icons.share_location_rounded, color: Color(0xFF38BDF8)),
-                        label: const Text('Share Track', style: TextStyle(color: Color(0xFF38BDF8))),
-                        style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF38BDF8))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            shopName ?? 'Pickup Location',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            pickup,
+                            style: TextStyle(color: textSecondary, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Delivery Location',
+                            style: TextStyle(
+                              color: textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            drop,
+                            style: TextStyle(color: textSecondary, fontSize: 11),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -723,195 +866,290 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
               ],
             ),
           ),
-        ),
-      ],
-    );
-  }
-
-  /// Customer #4: COMPLETED
-  Widget _buildCustomerCompletedView() {
-    final fare = _task['fareAmount'] ?? 245;
-    final driverName = _task['driverName'] ?? 'Ramesh Kumar Driver';
-    final shopName = _task['businessName'] ?? 'Gupta Super Store';
-    final shopId = _task['businessId']?.toString() ?? 'shop-101';
-    final driverId = _task['assignedDriverId']?.toString() ?? 'drv-301';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          // Celebration Card
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF1E293B)]),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
-            ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
-                  child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
-                ),
-                const SizedBox(height: 14),
-                const Text('Delivered & Completed!', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Thank you for ordering with ShopConnector.', style: TextStyle(color: Colors.white60, fontSize: 13)),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
 
-          // Rating Banner (Priority #1 on completed)
+          // ── Itemized Bill & Receipt Card ──
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              color: cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: cardBorder),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.stars_rounded, color: Color(0xFFF59E0B), size: 24),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: Text('How was your trip and store items?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      'Bill Summary',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'PAID VIA UPI',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      showOrderRatingBottomSheet(
-                        context,
-                        task: _currentTaskModel,
-                        viewerRole: 'Customer',
-                      );
-                    },
-                    icon: const Icon(Icons.rate_review_rounded, color: Colors.black),
-                    label: const Text('⭐ Rate Driver & Shop Now', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFF59E0B),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                _buildReceiptRow('Items Total', '₹$fare', textPrimary, textSecondary),
+                const SizedBox(height: 8),
+                _buildReceiptRow('Delivery Partner Fee', 'FREE', textPrimary, const Color(0xFF10B981)),
+                const SizedBox(height: 8),
+                _buildReceiptRow('Taxes & Packaging', '₹0', textPrimary, textSecondary),
+                Divider(
+                  height: 24,
+                  thickness: 1,
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Amount',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
+                    Text(
+                      '₹$fare',
+                      style: TextStyle(
+                        color: textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          // Receipt Breakdown
-          _buildInfoCard(
-            title: 'Bill & Receipt',
-            icon: Icons.receipt_rounded,
-            color: const Color(0xFF10B981),
-            children: [
-              _buildKeyValue('Total Amount Paid', '₹$fare', valueColor: const Color(0xFF34D399)),
-              _buildKeyValue('Delivery Mode', 'Zero Commission Direct Handover'),
-              _buildKeyValue('Completed At', 'Today at 1:15 PM'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Store & Driver Quick Profiles
-          _buildInfoCard(
-            title: 'Store & Partner Profiles',
-            icon: Icons.storefront_rounded,
-            color: const Color(0xFF38BDF8),
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(shopName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => showShopProfileSheet(context, businessId: shopId),
-                    icon: const Icon(Icons.storefront_rounded, size: 14, color: Color(0xFF10B981)),
-                    label: const Text('Store Profile', style: TextStyle(color: Color(0xFF10B981), fontSize: 12)),
-                  ),
-                ],
+          // ── Bottom Context Action Buttons ──
+          if (_currentStatus == TaskStatus.completed)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  if (widget.initialTask != null) {
+                    showOrderRatingBottomSheet(
+                      context,
+                      task: widget.initialTask!,
+                      viewerRole: 'Customer',
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Thank you! Rating submitted.')),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.star_rounded, size: 20),
+                label: const Text('Rate Partner & Order', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF59E0B),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
               ),
-              const Divider(color: Colors.white12, height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(driverName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => showDriverProfileSheet(context, driverId: driverId),
-                    icon: const Icon(Icons.person_pin_rounded, size: 14, color: Color(0xFF3B82F6)),
-                    label: const Text('Driver Profile', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12)),
-                  ),
-                ],
+            )
+          else if (_currentStatus == TaskStatus.pending)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _confirmDeletePendingOrder,
+                icon: const Icon(Icons.cancel_outlined, size: 18, color: Color(0xFFEF4444)),
+                label: const Text('Cancel Order Request', style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFEF4444)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
               ),
-            ],
-          ),
+            )
+          else if (_currentStatus == TaskStatus.cancelled)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Book Another Ride or Order', style: TextStyle(fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  /// Customer #5: CANCELLED
-  Widget _buildCustomerCancelledView() {
-    final reason = _task['shopRejectionReason'] ?? 'Cancelled by customer before dispatch';
+  Widget _buildOrderStepper(int currentStep, bool isDark) {
+    final steps = ['Placed', 'Accepted', 'On Way', 'Delivered'];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF7F1D1D), Color(0xFF1E293B)]),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4)),
+    return Row(
+      children: List.generate(steps.length * 2 - 1, (index) {
+        if (index.isOdd) {
+          final stepIndex = index ~/ 2;
+          final isPast = stepIndex < currentStep;
+          return Expanded(
+            child: Container(
+              height: 2,
+              color: isPast
+                  ? const Color(0xFF10B981)
+                  : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             ),
-            child: Column(
-              children: [
-                const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 48),
-                const SizedBox(height: 14),
-                const Text('Order Cancelled', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text('Reason: $reason', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildInfoCard(
-            title: 'Khata / Payment Status',
-            icon: Icons.account_balance_wallet_rounded,
-            color: const Color(0xFF38BDF8),
+          );
+        } else {
+          final stepIndex = index ~/ 2;
+          final isDone = stepIndex < currentStep;
+          final isCurrent = stepIndex == currentStep;
+
+          Color nodeColor;
+          Widget icon;
+
+          if (isDone) {
+            nodeColor = const Color(0xFF10B981);
+            icon = const Icon(Icons.check, color: Colors.white, size: 12);
+          } else if (isCurrent) {
+            nodeColor = const Color(0xFF2563EB);
+            icon = Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+            );
+          } else {
+            nodeColor = isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1);
+            icon = const SizedBox.shrink();
+          }
+
+          return Column(
             children: [
-              _buildKeyValue('Deduction', '₹ 0.00 (No penalty charged)'),
-              _buildKeyValue('Status', 'Refunded / Neutral Khata'),
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: nodeColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(child: icon),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                steps[stepIndex],
+                style: TextStyle(
+                  color: isCurrent
+                      ? const Color(0xFF2563EB)
+                      : (isDone
+                          ? const Color(0xFF10B981)
+                          : (isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8))),
+                  fontSize: 10,
+                  fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
             ],
+          );
+        }
+      }),
+    );
+  }
+
+  Widget _buildFlatOtpTile({
+    required String label,
+    required String code,
+    required Color cardBg,
+    required Color borderColor,
+    required Color textColor,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: code));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('📋 $label copied!'),
+            backgroundColor: textColor,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Book Another Ride or Order'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF3B82F6),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 4),
+            Text(
+              code,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.copy_rounded, color: textColor.withValues(alpha: 0.6), size: 10),
+                const SizedBox(width: 4),
+                Text(
+                  'Tap to copy',
+                  style: TextStyle(color: textColor.withValues(alpha: 0.6), fontSize: 9),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildReceiptRow(String label, String value, Color textPrimary, Color valueColor) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(color: textPrimary.withValues(alpha: 0.7), fontSize: 12)),
+        Text(value, style: TextStyle(color: valueColor, fontSize: 12, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
@@ -933,7 +1171,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF1E293B)]),
+              color: Color(0xFF064E3B).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
             ),
@@ -993,7 +1231,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)]),
+              color: Color(0xFF1E3A8A).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4)),
             ),
@@ -1092,7 +1330,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF312E81), Color(0xFF1E293B)]),
+              color: Color(0xFF312E81).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFF818CF8).withValues(alpha: 0.5)),
             ),
@@ -1193,7 +1431,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF1E293B)]),
+              color: Color(0xFF064E3B).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
             ),
@@ -1420,7 +1658,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF1E293B)]),
+              color: Color(0xFF1E3A8A).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Row(
@@ -1463,7 +1701,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
           Container(
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF064E3B), Color(0xFF1E293B)]),
+              color: Color(0xFF064E3B).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
             ),
@@ -1538,10 +1776,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
             Container(
               width: 3,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [color, color.withValues(alpha: 0.3)],
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                ),
+                color: color,
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   bottomLeft: Radius.circular(20),
@@ -1639,10 +1874,7 @@ class _TaskBookingDetailsScreenState extends State<TaskBookingDetailsScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF2D1F7F), Color(0xFF1A1060)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
-          ),
+          color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: const Color(0xFF6C63FF).withValues(alpha: 0.6)),
           boxShadow: [

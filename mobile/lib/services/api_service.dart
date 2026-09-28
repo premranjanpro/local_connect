@@ -744,6 +744,20 @@ class ApiService {
     throw Exception('Failed to load shop orders');
   }
 
+  static Future<List<dynamic>> getMyTasks(String token) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$baseUrl/tasks/my'),
+        headers: getHeaders(token),
+      );
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        return data is List ? data : [];
+      }
+    } catch (_) {}
+    return [];
+  }
+
   // ── Daily Subscriptions APIs ─────────────────────────────────────────────
 
   static Future<List<dynamic>> getSubscriptionCatalog() async {

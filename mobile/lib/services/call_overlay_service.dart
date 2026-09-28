@@ -163,10 +163,7 @@ class _IncomingCallOverlayState extends State<_IncomingCallOverlay>
               padding: const EdgeInsets.fromLTRB(12, 48, 12, 0),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A1A2E), Color(0xFF16213E), Color(0xFF0F3460)],
+                  color: const Color(0xFF0F172A), Color(0xFF16213E), Color(0xFF0F3460)],
                   ),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
@@ -200,8 +197,7 @@ class _IncomingCallOverlayState extends State<_IncomingCallOverlay>
                             height: 52,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF00C853), Color(0xFF1DE9B6)],
+                              color: const Color(0xFF10B981), Color(0xFF1DE9B6)],
                               ),
                               boxShadow: [
                                 BoxShadow(
@@ -309,8 +305,7 @@ class _IncomingCallOverlayState extends State<_IncomingCallOverlay>
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF00C853), Color(0xFF1DE9B6)],
+                              color: const Color(0xFF10B981), Color(0xFF1DE9B6)],
                               ),
                               shape: BoxShape.circle,
                               boxShadow: [

@@ -206,6 +206,24 @@ public class TasksController : ControllerBase
         return Ok(task);
     }
 
+    [HttpGet("my")]
+    public async Task<IActionResult> GetMyTasks()
+    {
+        var userId = GetUserId();
+        if (userId == null) return Unauthorized();
+
+        var tasks = await _dbContext.Tasks
+            .Include(t => t.Customer)
+            .Include(t => t.Business)
+            .Include(t => t.AssignedDriver)
+            .Where(t => t.CustomerId == userId.Value || t.AssignedDriverId == userId.Value)
+            .OrderByDescending(t => t.CreatedAt)
+            .Take(25)
+            .ToListAsync();
+
+        return Ok(tasks);
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetTask(Guid id)
     {

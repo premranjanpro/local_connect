@@ -38,14 +38,7 @@ class AppMenuDrawer extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      roleColor.withValues(alpha: 0.25),
-                      const Color(0xFF0F172A),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
+                  color: roleColor.withValues(alpha: 0.15),
                 ),
                 child: Row(
                   children: [

@@ -37,11 +37,7 @@ class SupportScreen extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF7F1D1D), Color(0xFF991B1B)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                color: const Color(0xFF991B1B),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: const Color(0xFFEF4444)),
                 boxShadow: [

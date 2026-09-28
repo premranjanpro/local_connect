@@ -3,10 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
   static const _key = 'app_theme_mode';
-  ThemeMode _mode = ThemeMode.dark;
+  ThemeMode _mode = ThemeMode.light;
 
   ThemeMode get mode => _mode;
   bool get isDark => _mode == ThemeMode.dark;
+  bool get isSystem => _mode == ThemeMode.system;
 
   ThemeProvider() {
     _load();
@@ -14,29 +15,39 @@ class ThemeProvider extends ChangeNotifier {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_key) ?? 'dark';
-    _mode = saved == 'light' ? ThemeMode.light : ThemeMode.dark;
+    final saved = prefs.getString(_key) ?? 'light';
+    if (saved == 'dark') {
+      _mode = ThemeMode.dark;
+    } else if (saved == 'system') {
+      _mode = ThemeMode.system;
+    } else {
+      _mode = ThemeMode.light;
+    }
+    notifyListeners();
+  }
+
+  Future<void> setMode(ThemeMode newMode) async {
+    _mode = newMode;
+    final prefs = await SharedPreferences.getInstance();
+    final str = newMode == ThemeMode.light
+        ? 'light'
+        : newMode == ThemeMode.system
+            ? 'system'
+            : 'dark';
+    await prefs.setString(_key, str);
     notifyListeners();
   }
 
   Future<void> toggle() async {
-    _mode = _mode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, _mode == ThemeMode.light ? 'light' : 'dark');
-    notifyListeners();
+    if (_mode == ThemeMode.dark) {
+      await setMode(ThemeMode.light);
+    } else {
+      await setMode(ThemeMode.dark);
+    }
   }
 
-  Future<void> setDark() async {
-    _mode = ThemeMode.dark;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, 'dark');
-    notifyListeners();
-  }
-
-  Future<void> setLight() async {
-    _mode = ThemeMode.light;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, 'light');
-    notifyListeners();
-  }
+  Future<void> setDark() => setMode(ThemeMode.dark);
+  Future<void> setLight() => setMode(ThemeMode.light);
+  Future<void> setSystem() => setMode(ThemeMode.system);
 }
+

@@ -63,11 +63,7 @@ class _OrderConfirmPageState extends State<OrderConfirmPage>
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(20, 60, 20, 28),
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF059669), Color(0xFF10B981)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: Color(0xFF10B981),
             ),
             child: Column(
               children: [

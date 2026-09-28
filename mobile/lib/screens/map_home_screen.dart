@@ -309,8 +309,7 @@ class _MapHomeScreenState extends State<MapHomeScreen>
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)],
+                      color: const Color(0xFF2563EB), Color(0xFF6366F1)],
                       ),
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [

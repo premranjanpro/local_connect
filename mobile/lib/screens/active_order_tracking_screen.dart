@@ -428,9 +428,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
                         scale: _pulseAnim,
                         child: Container(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF6C63FF), Color(0xFF3ECFCF)],
-                            ),
+                            color: const Color(0xFF2563EB),
                             shape: BoxShape.circle,
                             boxShadow: [BoxShadow(
                               color: const Color(0xFF6C63FF).withOpacity(0.5),
@@ -451,11 +449,8 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
             top: MediaQuery.of(context).size.height * 0.35,
             left: 0, right: 0, height: 80,
             child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, const Color(0xFF090D1A).withOpacity(0.95)],
-                ),
+              decoration: const BoxDecoration(
+                color: Colors.transparent,
               ),
             ),
           ),
@@ -583,11 +578,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
                         margin: const EdgeInsets.symmetric(horizontal: 32),
                         padding: const EdgeInsets.all(28),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF1E1B4B), Color(0xFF312E81)],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
+                          color: const Color(0xFF1E293B),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.6), width: 1.5),
                           boxShadow: [
@@ -716,10 +707,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              gradient: isActive ? const LinearGradient(
-                colors: [Color(0x22FF9F43), Color(0x11FF9F43)],
-              ) : null,
-              color: isActive ? null : const Color(0xFF1A1E2E),
+              color: isActive ? const Color(0xFFF59E0B).withValues(alpha: 0.15) : const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: isDone
@@ -990,9 +978,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-                  ),
+                  color: const Color(0xFF1E293B),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF3B82F6).withOpacity(0.4)),
                 ),
@@ -1094,9 +1080,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 14),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF4F46E5), Color(0xFF6C63FF)],
-                ),
+                color: const Color(0xFF2563EB),
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
@@ -1463,14 +1447,7 @@ class _ActiveOrderTrackingScreenState extends State<ActiveOrderTrackingScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFF59E0B).withOpacity(0.18),
-            const Color(0xFF1E293B),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4), width: 1.5),
         boxShadow: [

@@ -75,8 +75,7 @@ Widget _fareChip(double? fare, {String prefix = '₹'}) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-          colors: [Color(0xFF10B981), Color(0xFF059669)]),
+      color: const Color(0xFF10B981),
       borderRadius: BorderRadius.circular(8),
     ),
     child: Text('$prefix${fare.toStringAsFixed(0)}',
@@ -106,14 +105,7 @@ class TaskCard1CabRide extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF1E293B),
-              task.status.color.withValues(alpha: 0.12),
-            ],
-          ),
+          color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
               color: task.status.color.withValues(alpha: 0.35), width: 1.2),
@@ -235,13 +227,7 @@ class TaskCard2Grocery extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFF059669).withValues(alpha: 0.4),
-                      Colors.transparent
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight),
+                color: const Color(0xFF059669).withValues(alpha: 0.15),
                 borderRadius:
                     const BorderRadius.vertical(top: Radius.circular(18)),
               ),
@@ -337,13 +323,7 @@ class TaskCard3Timeline extends StatelessWidget {
               width: 4,
               height: 90,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      task.status.color,
-                      task.status.color.withValues(alpha: 0.3)
-                    ]),
+                color: task.status.color,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -529,11 +509,7 @@ class TaskCard5Completed extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF064E3B), Color(0xFF1E293B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
         ),
@@ -1052,10 +1028,7 @@ class TaskCard11Banner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-            colors: [Color(0xFF1E1B4B), Color(0xFF1E293B)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight),
+        color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(16),
         border:
             Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.4)),

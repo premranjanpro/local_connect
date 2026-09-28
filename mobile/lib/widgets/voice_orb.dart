@@ -40,11 +40,7 @@ class _VoiceOrbState extends State<VoiceOrb> with SingleTickerProviderStateMixin
             height: widget.size,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: LinearGradient(
-                colors: widget.isSpeaking
-                    ? [Colors.greenAccent, Colors.tealAccent, Colors.cyanAccent]
-                    : [Colors.indigoAccent, Colors.purpleAccent, Colors.pinkAccent],
-              ),
+              color: widget.isSpeaking ? const Color(0xFF10B981) : const Color(0xFF2563EB),
               boxShadow: [
                 BoxShadow(
                   color: (widget.isSpeaking ? Colors.greenAccent : Colors.purpleAccent).withValues(alpha: 0.5),

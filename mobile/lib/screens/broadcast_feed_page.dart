@@ -148,8 +148,7 @@ class _BroadcastFeedPageState extends State<BroadcastFeedPage>
           Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [Color(0xFF8B5CF6), Color(0xFF6366F1)]),
+              color: const Color(0xFF2563EB), Color(0xFF6366F1)]),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.cell_tower_rounded,

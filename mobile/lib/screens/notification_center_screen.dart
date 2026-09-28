@@ -163,11 +163,7 @@ class NotificationCenterScreen extends StatelessWidget {
       flexibleSpace: FlexibleSpaceBar(
         background: Container(
           decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF060B18)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: Color(0xFF1E293B),
           ),
           child: SafeArea(
             child: Padding(
@@ -397,17 +393,9 @@ class _NotificationCard extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
-              gradient: isUnread
-                  ? LinearGradient(
-                      colors: [
-                        config.color.withValues(alpha: 0.08),
-                        const Color(0xFF1E293B),
-                      ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    )
-                  : null,
-              color: isUnread ? null : const Color(0xFF1E293B),
+              color: isUnread
+                  ? config.color.withValues(alpha: 0.1)
+                  : const Color(0xFF1E293B),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: isUnread

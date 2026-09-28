@@ -104,15 +104,7 @@ class _WaveformPainter extends CustomPainter {
       );
 
       final paint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            primaryColor.withValues(alpha: isSpeaking ? 0.95 : 0.45),
-            Colors.white.withValues(alpha: isSpeaking ? 0.9 : 0.3),
-            primaryColor.withValues(alpha: isSpeaking ? 0.85 : 0.35),
-          ],
-        ).createShader(barRect.outerRect);
+        ..color = primaryColor.withValues(alpha: isSpeaking ? 0.95 : 0.45);
 
       canvas.drawRRect(barRect, paint);
     }

@@ -72,14 +72,7 @@ class OffersNearMeScreen extends StatelessWidget {
           return Container(
             margin: const EdgeInsets.only(bottom: 14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withValues(alpha: 0.15),
-                  const Color(0xFF1E293B),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: color.withValues(alpha: 0.4)),
               boxShadow: const [

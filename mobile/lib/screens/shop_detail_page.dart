@@ -192,14 +192,7 @@ class _ShopDetailPageState extends State<ShopDetailPage> {
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      shopColor,
-                      shopColor.withValues(alpha: 0.7),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: shopColor,
                 ),
                 child: SafeArea(
                   child: Padding(
